@@ -12,7 +12,8 @@ Everything in `public/` is the website. Vercel serves that folder as the site ro
 | `public/index.html` | The test page: pick a passage, tap the mic and read aloud, see mistakes marked in red on the page. Passage editing, listening mode, sample recordings and engine details are under **Test tools** (top right) |
 | `public/lib/vosk.js` | vosk-browser 0.0.8: the Vosk speech engine compiled to WebAssembly (~5.8 MB) |
 | `public/models/en-in.tar.gz` | Vosk small **Indian English** model 0.4, repacked from the official zip (~36 MB) |
-| `public/samples/*.wav` | Synthetic test readings (macOS "Aman" voice) with known, deliberate mistakes |
+| `public/samples/*.wav` | Synthetic test readings (macOS "Aman" voice), each with a known mistake: correct, skipped words, changed words, dropped "-s" endings, a repeat plus an added word, a self-correction, pauses mid-phrase, and word-by-word reading. Each one is listed in **Tools** with what it should show |
+| `public/js/scoring.js` | All the scoring rules: mistake types, accents, patterns, pauses, rubric and messages. Thresholds are in its `CONFIG` |
 
 ## Results on this Mac (synthetic voice)
 

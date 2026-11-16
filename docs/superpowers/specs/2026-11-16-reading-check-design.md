@@ -97,99 +97,189 @@ Android app (native)
 
 ## 7. Recognition details
 
-- **Grammar (default):** the passage's sentences as whole phrases, plus every passage word on its own, plus `"[unk]"`. **[my call, based on spike]**
-- **Extra-word detection:** a second, open-vocabulary pass would catch words like "many". It roughly doubles the processing work. **[after tablet test]**
-  - If tablets process at ≤ 0.3× real time with one pass, run both passes and use the open pass only to add "extra" words.
-  - Otherwise, ship sentence mode alone.
+**Two passes over the same audio, run side by side. [decided: clarity, accents and added words need what was actually said]**
+
+- **Passage pass:** limited to the passage, plus `"[unk]"`. It recognises:
+  - the passage's sentences as whole phrases,
+  - every passage word on its own,
+  - common learner variants of passage words: "bird" for "birds", "walk" for "walked", "go" for "going".
+
+  It gives the timing and tells which passage word was read.
+- **Open pass:** the full English vocabulary. It hears what was actually said, and is used to:
+  - judge clarity (§8),
+  - spot accents (§8),
+  - name words that are not in the passage.
+- **Cost:** the two passes roughly double the processing. On this Mac both together ran at about 0.15× real time. **This must be measured on the target tablets** (§14, Phase 0).
+- **Pauses are measured from the audio, not from word times.**
+  - The engine's word times run into each other, because it folds silence into the words. In tests, even 0.5 s gaps after every word showed as 0.00 s.
+  - The page therefore tracks loudness in 20 ms slices and finds the quiet stretches (≥ 0.12 s).
+  - Each quiet stretch is assigned to the nearest word boundary.
 - **Text normalisation** (passage and heard words): lower-case, strip punctuation, normalise curly apostrophes, keep contractions as one word.
-  - **Passages must write numbers as words** ("twenty", not "20"). This is a content rule; the authoring check enforces it.
-- **Words the model doesn't know** (names, rare words) can't be recognised. Vosk silently ignores them in the grammar.
-  - An **authoring-time check** flags any passage word that's not in the model's vocabulary, so the content team can change it or accept that the word won't be scored.
-  - Such words are marked "not checked" and left out of the score. **[my call]**
+  - **Passages must write numbers as words** ("twenty", not "20"). This is a content rule, enforced by the authoring check.
+- **Words the model doesn't know** (names, rare words) can't be recognised; Vosk silently ignores them in the grammar.
+  - An **authoring-time check** flags such words.
+  - They are marked "not checked" and left out of the score. **[my call]**
 
 ## 8. Scoring
 
-**Alignment:** word-level edit distance between passage words and heard words (as in the spike). Each passage word gets a status:
+All scoring is in `public/js/scoring.js`: pure functions, unit-tested in `tests/scoring.test.js` (17 tests, run with `node --test tests/scoring.test.js`). Every threshold is in its `CONFIG`.
 
-| Status | Meaning | Counts against learner? |
+**Alignment:** word-level edit distance between the passage and the passage pass. A learner variant or a similar-sounding word costs less than an unrelated word, so it lines up in place.
+
+**Mistake types** (item 1), each with a plain label and whether it changes the meaning:
+
+| Type | Label | Counts as a mistake? | Changes the meaning? |
+|---|---|---|---|
+| Read as written | – | – | – |
+| Skipped | Skipped | Yes | Yes for content words; no for small words like "the" and "my" |
+| Changed | Changed | Yes | Yes, unless the change is a small word for a small word, or a dropped ending (labelled "Small change") |
+| Added | Added | Yes | Yes for content words, no for small words |
+| Unclear | Unclear | **No**; left out of the accuracy total | Unknown |
+| Sound tip | Sound tip | **No**; counts as correct (item 2) | No |
+| Fixed it yourself | Fixed it yourself | **No** (item 9) | – |
+| Repeated | (shown on the timeline) | **No** (item 9) | – |
+
+- **"Changes the meaning" is an estimate**, based on content words versus a list of small function words. Teacher reviews should be used to check it.
+- **Accents and clarity (items 2 and 10):**
+  - **Sound tip, not a mistake:** the passage pass heard the right word, but the open pass heard a close sound ("part" for "park", "wait" for "waits"). This also applies when the passage pass couldn't name the word and the open pass heard something close.
+  - **Change:** the open pass clearly heard a *different* word where the passage pass heard `[unk]`, for example "garden" for "park".
+  - **Clarity** is the share of spoken words the open pass heard exactly as written.
+  - This is a heuristic. A real pronunciation assessment (scoring each sound) isn't available offline in this engine.
+- **Repeated patterns (item 3):** one line each, with the learner's own examples, when a mistake type appears at least twice. For example: "You often drop the “-s” at the end of words: birds → bird, trees → tree, flowers → flower." Patterns covered:
+  - dropped "-s", "-ed" or "-ing" endings
+  - skipping small words
+  - skipping important words
+  - adding words
+  - sound tips
+  - stopping mid-phrase
+  - reading past full stops
+  - reading word by word
+- **Self-corrections and repeats (item 9):**
+  - **Self-correction:** an extra word right before the correct word that sounds like it or starts it ("question… questions", "gran… grandmother"). It's shown with a "✓ fixed" note.
+  - **Repeat:** a passage word said again within three words of where it belongs.
+  - **Stuck:** a mid-phrase pause of 2 s or more.
+- **Pauses (item 7):** each pause is judged by where it falls:
+  - At a full stop: ≥ 0.25 s is good.
+  - At a comma: ≥ 0.12 s is good.
+  - Mid-phrase: ≥ 0.7 s is a hesitation.
+  - Under 0.12 s at a full stop: the reader ran past it.
+- **Speed and smoothness (item 8):**
+  - Timed from the first spoken word to the last.
+  - **Words correct per minute** is reported for information.
+  - **Word by word:** at least 45% of in-phrase gaps are 0.3 s or longer.
+
+**Rubric (item 11). [decided: the course's rubric; band thresholds are placeholders]**
+
+| Part | Marks | Placeholder bands |
 |---|---|---|
-| `correct` | Read as written | – |
-| `missed` | Not heard | Yes |
-| `wrong` | Something else heard (confidence ≥ threshold) | Yes |
-| `unsure` | Mismatch, but low confidence (< 0.5) | **No.** Shown in a neutral style |
-| `repeated` | Same passage word said twice in a row | **No** |
-| `not-checked` | Word not in model vocabulary | No, and excluded from the total |
+| Accuracy | out of 4 | 4: ≥ 97% · 3: ≥ 90% · 2: ≥ 80% · 1: below |
+| Pace | out of 3 | 3: within 80–140 wcpm · 2: within 20% outside that band · 1: further |
+| Phrasing | out of 3 | 3: pauses at ≥ 75% of full stops, at most 1 mid-phrase pause, not word by word, at most 1 run-past · 2: at most 3 mid-phrase pauses and ≥ 50% of full stops · 1: otherwise |
+| **Total** | **out of 10** | sum |
+| Reading speed | for information | words correct per minute |
 
-Extra words are listed between the words where they occurred. They count only if they come from the open pass (§7). Repetitions and self-corrections are not penalised, following common reading-assessment practice. **[my call]**
+**Message (item 4):** matched to the total, with the most important point first. Mistakes are ranked: meaning-changing changes, then skips, then added content words, then small slips, unclear words, and sound tips last.
 
-**Numbers shown:**
-- **Accuracy** = correct ÷ checked words. "Unsure" and "not-checked" words are left out of the total, so they neither help nor hurt. **[my call]** Extra words don't lower the accuracy number, but any extra word stops the verdict from reaching "Excellent". **[my call]**
-- **Words per minute** = correct words ÷ speaking time, from the first heard word to the last.
-- **Counts** of missed, wrong and extra words.
+| Total | Headline | Lead |
+|---|---|---|
+| 9–10 | Excellent reading! | One small thing: … |
+| 7–8 | Well done! | Main thing to work on: … |
+| 5–6 | Good effort! | Let's fix this first: … |
+| up to 4 | Let's practise this one together. | Start with this: … |
 
-**Verdict bands** are configurable per passage, with defaults **[my call]**:
-- ≥ 95%: "Excellent"
-- 80–94%: "Good, check the highlighted words"
-- < 80%: "Let's practise again"
-
-**Result object** passed to the app, one per attempt:
+**Result object** passed to the app, one per attempt (extend as needed):
 ```json
 {
-  "passageId": "m3-l2-p1", "attempt": 2, "startedAt": "2026-11-16T10:04:11Z",
-  "accuracy": 0.94, "wpm": 88, "durationSec": 21.4,
-  "counts": { "correct": 31, "missed": 1, "wrong": 1, "extra": 0, "unsure": 1 },
-  "words": [ { "i": 0, "text": "Every", "status": "correct", "conf": 0.99 }, "…" ],
-  "engine": { "mode": "sentences", "model": "en-in-0.4", "rtf": 0.31 }
+  "passageId": "morning-walk", "attempt": 2, "startedAt": "2026-11-16T10:04:11Z", "mode": "practice",
+  "rubric": { "accuracy": 3, "pace": 3, "phrasing": 2, "total": 8 }, "accuracyPct": 94, "wcpm": 118, "readingSec": 17.3,
+  "counts": { "correct": 32, "skipped": 1, "changed": 1, "added": 0, "unclear": 0, "tips": 1, "repeats": 1, "selfCorrected": 1 },
+  "pauses": { "goodFull": 2, "fullStops": 2, "goodComma": 1, "commas": 2, "hesitations": [ { "before": "speaker", "sec": 1.4 } ], "wordByWord": false },
+  "patterns": [ "ending-s" ], "clarity": 94,
+  "words": [ { "i": 0, "text": "Every", "status": "ok", "conf": 0.99, "start": 0.06, "end": 0.34 }, "…" ],
+  "quiz": { "right": 2, "of": 3 },
+  "review": null
 }
 ```
 
 ## 9. Learner experience
 
+**Practice and test (item 5). [decided]** A switch in the top bar sets the mode:
+
+| | Practice | Test |
+|---|---|---|
+| While reading | Words light up as they're read | No help: the passage stays plain |
+| After reading | Marks on the passage, tap a word for details and to hear it, analysis, what to practise | Score and rubric only; no marks or hints |
+| Questions | Right answers shown after checking | Score saved; answers not revealed |
+
+**Calm colours and simple labels (item 6). [decided]** No red anywhere:
+
+| What | Colour | Line shape |
+|---|---|---|
+| Read correctly | Blue | – |
+| To fix (skipped, changed, added) | Amber | Dashed (skipped), wavy (changed), caret ^ (added) |
+| Sound tip | Violet | Dotted |
+| Unclear | Grey | Dotted |
+| Recording button | Brick | – |
+
+- The circled score is ink blue.
+- The colours passed the colour-blind check, and the line shapes also tell the types apart.
+
 ```
 ┌──────────────────────────────────────────────┐
-│  Morning Walk                     ★★☆  best 86% │
-│                                              │
-│  Every morning my grandmother and I go for   │
-│  a walk in the park. We look at the birds…   │
-│                                              │
-│            [ 🎤  Start reading ]              │
-└──────────────────────────────────────────────┘
-        ↓ tap                ↓ reading: words turn blue as they're read, [highlighter] on the current word
-┌──────────────────────────────────────────────┐
-│  Good try!  86%   ·  2 missed  ·  1 wrong     │
-│                                              │
-│  Every morning ~~my~~ grandmother and I go…  │
-│  …the birds, ~~the trees~~ and the flowers…  │
-│  …we buy fresh [fruit → vegetables] from…    │
-│                                              │
-│  ▶ Hear my reading   [ Try again ]  [ Next ] │
+│ Morning Walk ▾        [Practice|Test]  Tools │
+│ ┌──────────────────────────────────────────┐ │
+│ │ Morning Walk                     ( 7/10 ) │ │
+│ │ Every morning my grandmother and I go…    │ │
+│ │ …in the park. We look at the birds, the  │ │
+│ │       garden            ≈bird     tree    │ │
+│ │ …     ﹏﹏﹏                ﹏﹏           │ │
+│ └──────────────────────────────────────────┘ │
+│ Well done!                                   │
+│ Main thing to work on: “park” was read as    │
+│ “garden”, which changes the meaning.         │
+│ Accuracy 3/4   Pace 3/3   Phrasing 2/3       │
+│         ( 🎤 )   [Hear my reading] [Teacher review] │
 └──────────────────────────────────────────────┘
 ```
 
 - **Start and stop:**
-  - Recording **stops automatically** when the last passage word has been heard and 1.5 s of silence follows.
-  - It also stops after a maximum time of 2.5× the expected reading time, based on 60 words per minute.
-  - A **Stop** button is always available. **[my call]**
-- **While reading:** the page follows along live. **[decided]**
-  - Words already read turn ink-blue, and the word the learner has just reached gets a yellow highlighter mark. The page scrolls to keep it in view.
-  - The position is the passage prefix that best matches everything heard so far (word edit distance; on a tie, the further position), recalculated on every partial result. In the spike it moved forward steadily, with no jumps back, and passed over skipped words.
-  - Live tracking only shows position. Mistakes are marked only after reading stops, so the learner isn't distracted mid-sentence.
-  - The mic button shows a ring that follows the input level, so learners can see they're being heard.
-- **Result screen:**
-  - The marked-up passage, using the spike's colours plus a neutral style for "unsure".
-  - Tapping a highlighted word plays **the learner's own audio** of that moment, using word timestamps. This works offline. **[my call]**
-  - "Hear my reading" plays the whole recording.
-- **Retries** are unlimited. The best and latest scores are kept. **[my call]**
-- **Error states**, each with a clear, friendly message and a next step:
-  - Microphone permission denied.
-  - Engine failed to load.
-  - Nothing heard (silence or too quiet).
-  - Too short (fewer than 30% of words heard). Shows "Let's try that again" without a score.
+  - Recording **stops automatically** when the last passage word has been heard and 1.5 s of silence follows, or after 2.5× the expected reading time.
+  - A **Stop** button is always available. **[my call; auto-stop not built in the spike yet]**
+- **While reading (practice):** words already read turn ink-blue, and the current word gets a yellow highlighter mark. The position is the passage prefix that best matches what has been heard. It steps back if the reader goes back.
+- **Tap a marked word:** a pop-up shows:
+  - the type and whether it changes the meaning,
+  - one plain sentence,
+  - "▶ Hear it", the learner's own audio of that moment ("Hear this part" for a skipped word).
+- **Reading analysis:**
+  - **Score tiles:** total out of 10, then accuracy, pace and phrasing with the reason for each.
+  - **An information line:** words correct per minute, reading time, how many words were clearly spoken, and words per phrase.
+  - **Words to check:** most important first, with labels and a play button.
+  - **What to practise:** the patterns, plus positives (fixed words, paused at every full stop) and the change since the last try.
+  - **Reading timeline:** words coloured by type; pauses at punctuation in pale blue, mid-phrase pauses in yellow with their length.
+  - **Sentence by sentence.**
+  - **Tries on this passage:** score, accuracy, pace, mode, and whether a teacher checked it.
+- **Questions after reading (item 12). [decided]**
+  - Passages can include multiple-choice questions, shown after the reading in both modes.
+  - The questions in the spike were written as examples.
+- **Teacher review (item 13). [decided]** A **Teacher review** window offers:
+  - the recording,
+  - editable rubric marks (changing word marks suggests a new accuracy mark),
+  - every marked word with a "teacher says" choice and a play button,
+  - extra words marked as added, repeated or not a word,
+  - a note.
+
+  When it's saved:
+  - the learner's screen shows **"Checked by your teacher"** with the teacher's marks and note;
+  - the review is stored next to the tool's original marks, so the scoring can be tuned;
+  - **Tools → Download reviews (JSON)** exports all reviews.
+
+  Recordings are not stored. In the spike, reviews are saved in the browser; the real course would send them through the app (§11, question 2).
+- **Error states:** the mic is blocked, the engine failed to load, or too little was heard ("Hold the tablet closer and read a little louder"). Each has a clear next step.
 
 ## 10. Content authoring
 
 - Each lesson has a `passages.json`:
-  `{ id, title, text, level, verdictBands?, modelAudio? }`
+  `{ id, title, text, level, rubric?, paceTarget?, modelAudio?, questions?: [{ q, options[], answer }] }`
 - **Authoring check script**, run before shipping content. It flags:
   - words not in the model vocabulary,
   - digits,
@@ -204,6 +294,9 @@ Extra words are listed between the words where they occurred. They count only if
 4. UI language for instructions and feedback: English only, or also Hindi or regional languages?
 5. Should passages have a "Listen first" model reading?
 6. Can the app install include the 36 MB model, or must it be downloaded once after install?
+7. **The rubric's real band thresholds:** which accuracy % earns 4, 3, 2 or 1? What pace range earns 3? What counts as good phrasing? The spike uses placeholders (§8).
+8. Should the rubric start at 0 or 1 for each part? The spike uses 1, so the lowest total is 3.
+9. Who writes the comprehension questions, and should answers ever be spoken instead of tapped?
 
 ## 12. Risks
 
@@ -214,6 +307,10 @@ Extra words are listed between the words where they occurred. They count only if
 | Real children's voices + classroom noise far worse than synthetic tests | Collect 20–30 real recordings early; tune threshold and mode on them |
 | Names/rare words unrecognisable | Authoring check; "not checked" status |
 | Licences | Confirm vosk-browser and the Vosk model licences before release |
+| Two recognition passes are too slow on tablets | Measure in Phase 0; if needed, run the open pass only after Stop, or only on words the passage pass marked unclear |
+| "Sound tip" lets a real misreading through as an accent | Tune with teacher reviews; the review export records every case where teacher and tool differ |
+| "Changes the meaning" is an estimate from word lists | Check against teacher reviews; allow per-passage overrides for key words |
+| Synthetic samples hide real problems (one swapped word, "vegetables", was heard by neither pass) | Real learner recordings in Phase 0 |
 | The model is stored twice: once in the app and once unpacked in IndexedDB (~56 MB) | Measure free storage on target tablets; if tight, look at loading the model straight from app storage |
 | No real learner recordings available off-device | Tune on adult and synthetic stand-ins, and state clearly that §13 acceptance is not yet verified |
 

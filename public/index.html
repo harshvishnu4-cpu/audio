@@ -12,7 +12,10 @@
 <style>
   :root {
     --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0; --edge: #c3cad6;
-    --ink: #1e3a8a; --text: #1f2937; --muted: #5b6475; --pen: #c8312b; --pen-soft: #fbe9e7;
+    --ink: #1e3a8a; --text: #1f2937; --muted: #5b6475;
+    /* calm marks, no red (validated for colour-blind separation): read / to fix / sound tip / unclear */
+    --read: #4f6bc0; --fix: #c27a12; --fix-ink: #8f5508; --fix-soft: #fdf1dc; --tip: #9a4fb0; --tip-soft: #f4eaf8; --unclear: #7d8799;
+    --rec: #b4532a; /* recording button only */
 
     /* Size scale, mobile first. These base values are for the narrowest phones (under 360px);
        the media queries below step them up. Type and ruling are in rem so the page grows with the
@@ -82,22 +85,29 @@
   .passage .w.done { color: var(--ink); }
   .passage .w.here { color: var(--text); background: #fde68a; border-radius: 4px; box-shadow: 0 0 0 4px #fde68a; }
   @media (prefers-reduced-motion: no-preference) { .passage .w { transition: color .2s, background-color .15s, box-shadow .15s; } }
-  .passage .w.miss { color: #9aa3b2; text-decoration: line-through; text-decoration-color: var(--pen); text-decoration-thickness: 3px; }
-  .passage .w.wrong { text-decoration: underline wavy var(--pen); text-decoration-thickness: 2px; text-underline-offset: 7px; }
-  .passage .w.unsure { text-decoration: underline dotted #8a94a6; text-decoration-thickness: 2px; text-underline-offset: 7px; }
+  /* marks after reading: calm colours, the shape tells the type too (dashed, wavy, dotted) */
+  .passage .w.skip { color: #8a93a3; text-decoration: underline dashed var(--fix); text-decoration-thickness: 2px; text-underline-offset: 7px; cursor: pointer; }
+  .passage .w.change { text-decoration: underline wavy var(--fix); text-decoration-thickness: 2px; text-underline-offset: 7px; cursor: pointer; }
+  .passage .w.unclear { text-decoration: underline dotted var(--unclear); text-decoration-thickness: 2px; text-underline-offset: 7px; cursor: pointer; }
+  .passage .w.tip { text-decoration: underline dotted var(--tip); text-decoration-thickness: 2px; text-underline-offset: 7px; cursor: pointer; }
+  .passage .w.selfc { cursor: pointer; }
+  .passage.plain .w { text-decoration: none; color: var(--text); cursor: default; }
+  .passage.plain [data-note]::before, .passage.plain .ins { display: none; }
   /* notes over marked words; --nudge is set by fitNotes() to keep a note on the page near its edges */
   .passage .w[data-note]::before { content: attr(data-note); position: absolute; left: 50%; bottom: calc(100% - 10px); transform: translateX(calc(-50% + var(--nudge, 0px)));
-                                   font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; pointer-events: none; }
-  .passage .w.unsure[data-note]::before { color: #8a94a6; }
+                                   font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--fix-ink); white-space: nowrap; pointer-events: none; }
+  .passage .w.tip[data-note]::before { color: var(--tip); }
+  .passage .w.selfc[data-note]::before { color: var(--read); font-style: normal; }
   .passage .ins { position: relative; display: inline-block; width: 0; height: 0; }
-  .passage .ins::after { content: "^"; position: absolute; left: -11px; top: 0; color: var(--pen); font: 800 24px/1 Roboto, system-ui, sans-serif; }
+  .passage .ins::after { content: "^"; position: absolute; left: -11px; top: 0; color: var(--fix); font: 800 24px/1 Roboto, system-ui, sans-serif; }
   .passage .ins::before { content: attr(data-note); position: absolute; left: -5px; bottom: calc(var(--lh) - 1.75rem); transform: translateX(calc(-50% + var(--nudge, 0px)));
-                          font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; }
+                          font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--fix-ink); white-space: nowrap; }
 
   /* teacher's circled score */
   .grade { position: absolute; top: var(--grade-top); right: var(--grade-right); width: var(--grade-w); height: var(--grade-h); display: grid; place-items: center;
-           color: var(--pen); font-size: var(--grade-fs); font-weight: 800; letter-spacing: -1px; transform: rotate(-6deg); pointer-events: none; }
-  .grade::before { content: ""; position: absolute; inset: 0; border: 3px solid var(--pen); border-radius: 50%;
+           color: var(--ink); font-size: var(--grade-fs); font-weight: 800; letter-spacing: -1px; transform: rotate(-6deg); pointer-events: none; }
+  .grade small { font-size: 0.5em; font-weight: 700; margin-left: 1px; }
+  .grade::before { content: ""; position: absolute; inset: 0; border: 3px solid var(--ink); border-radius: 50%;
                    border-top-color: transparent; transform: rotate(18deg); }
   @media (prefers-reduced-motion: no-preference) {
     .grade:not([hidden]) { animation: stamp .35s ease-out; }
@@ -109,25 +119,185 @@
   .verdict { margin: 0; font-size: var(--fs-verdict); font-weight: 700; color: var(--ink); min-height: 1px; text-wrap: balance; }
   .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 0; color: var(--muted); font-size: 0.9375rem; }
   .stats b { color: var(--text); font-size: 1.125rem; }
-  .stats .bad b { color: var(--pen); }
+  .stats .bad b { color: var(--fix-ink); }
   .mic { --level: 0; width: var(--mic); height: var(--mic); border-radius: 50%; border: 0; cursor: pointer; margin-top: 8px;
          background: var(--ink); color: #fff; display: grid; place-items: center;
          box-shadow: 0 0 0 calc(6px + var(--level) * 22px) rgba(30, 58, 138, .14); transition: box-shadow .08s linear, background .2s; }
   .mic svg { width: 42%; height: 42%; }
-  .mic.recording { background: var(--pen); box-shadow: 0 0 0 calc(6px + var(--level) * 22px) rgba(200, 49, 43, .16); }
+  .mic.recording { background: var(--rec); box-shadow: 0 0 0 calc(6px + var(--level) * 22px) rgba(180, 83, 42, .16); }
   .mic:disabled { background: #a7b0bf; cursor: default; box-shadow: none; }
   .mic-label { font-size: 1.0625rem; color: var(--muted); min-height: 26px; text-wrap: balance; }
-  .mic-label.err { color: var(--pen); }
+  .mic-label.err { color: var(--fix-ink); }
   .after { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
   .ghost { border: 1px solid var(--edge); background: var(--paper); border-radius: 99px; padding: 10px 18px; cursor: pointer; color: var(--ink); font-weight: 600; }
   .key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 14px 0 0; font-size: 0.875rem; color: var(--muted); }
-  .key .k { color: var(--pen); font-weight: 700; }
+  .key .k { font-weight: 700; }
   .note { margin: 6px auto 0; max-width: 620px; font-size: 0.875rem; color: var(--muted); background: #f6f8fb; border: 1px dashed var(--edge); border-radius: 10px; padding: 8px 14px; }
   @media (min-width: 37.5em) {
     .bar { gap: 12px; padding-bottom: 6px; }
     main { padding-top: 8px; }
     .stats { gap: 6px 22px; font-size: 1rem; }
   }
+
+  /* reading analysis: a plain sheet under the notebook page */
+  .analysis { --read: #4f6bc0; --unsure: #7d8799; --hes: #fde68a; --line: #e5e8ee;
+              margin-top: calc(var(--controls-gap) + 12px); background: var(--paper); border-radius: 4px;
+              box-shadow: 0 1px 0 #d5dbe5, 0 12px 30px -18px rgba(30, 58, 138, .35); padding: 22px 16px 24px; }
+  .analysis h2 { margin: 0 0 16px; font-size: var(--fs-verdict); color: var(--ink); }
+  .analysis h3 { margin: 0 0 12px; font-size: 1rem; color: var(--text); }
+  .block { margin-top: 28px; min-width: 0; }
+
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .tile { padding: 12px 12px 14px; border-left: 1px solid var(--line); min-width: 0; }
+  .tile:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .tile:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .t-l { font-size: 0.875rem; color: var(--muted); font-weight: 600; }
+  .t-v { font-size: 1.875rem; font-weight: 800; line-height: 1.15; color: var(--text); font-variant-numeric: tabular-nums; }
+  .t-v span { font-size: 0.9375rem; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .t-s { font-size: 0.875rem; color: var(--text); }
+  .t-s small { color: var(--muted); font-size: 0.8125rem; }
+
+  .tl-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8125rem; color: var(--muted); }
+  .tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { display: inline-block; width: 14px; height: 10px; border-radius: 3px; background: var(--read); }
+  .sw.change, .tl-word.change { background: var(--fix); }
+  .sw.tip, .tl-word.tip { background: var(--tip); }
+  .sw.selfc, .tl-word.selfc { background: var(--read); box-shadow: inset 0 -4px 0 var(--tip); }
+  .sw.unclear, .tl-word.unclear { background: var(--unclear); }
+  .sw.extra, .tl-word.extra { background: repeating-linear-gradient(135deg, var(--fix) 0 3px, #f6dcb0 3px 6px); }
+  .sw.repeat, .tl-word.repeat { background: repeating-linear-gradient(135deg, var(--read) 0 3px, #c9d3f0 3px 6px); }
+  .tl-word.noise { background: #c9ced8; }
+  .sw.pause { background: var(--hes); }
+  .timeline { position: relative; height: 36px; margin-top: 34px; }
+  .tl-word { position: absolute; top: 0; height: 36px; min-width: 3px; padding: 0; border: 0; border-radius: 4px; background: var(--read); cursor: pointer; }
+  .tl-word:focus-visible { outline-offset: 2px; }
+  .tl-pause { position: absolute; top: -4px; height: 44px; background: var(--hes); border-radius: 4px; }
+  .tl-pause span { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 3px; white-space: nowrap;
+                   font-size: 0.75rem; font-weight: 600; color: var(--text); }
+  .tl-axis { position: relative; height: 22px; margin-top: 10px; border-top: 1px solid #d5dbe5; font-size: 0.75rem; color: var(--muted); }
+  .tl-axis span { position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tl-axis span:first-child { transform: none; }
+  .tl-hint { margin: 6px 0 0; font-size: 0.8125rem; color: var(--muted); }
+  .tl-tip { position: fixed; z-index: 5; display: grid; gap: 2px; padding: 8px 12px; border-radius: 8px; background: var(--paper); color: var(--text);
+            box-shadow: 0 6px 24px rgba(15, 23, 42, .18), 0 0 0 1px var(--line); font-size: 0.875rem; pointer-events: none; max-width: 260px; }
+  .tl-tip span { color: var(--muted); font-size: 0.8125rem; }
+
+  .s-bar { position: relative; flex: 1; height: 8px; border-radius: 4px; background: #eef1f6; overflow: hidden; }
+  .s-bar span { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--read); }
+  .sentences { margin: 0; padding-left: 1.4em; display: grid; gap: 14px; }
+  .sentences li::marker { color: var(--muted); font-weight: 600; }
+  .s-text { font-size: 0.9375rem; color: var(--text); }
+  .s-row { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .s-row b { font-size: 0.875rem; min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .s-note { font-size: 0.8125rem; color: var(--fix-ink); margin-top: 2px; }
+  .tips { margin: 0; padding-left: 1.2em; display: grid; gap: 10px; font-size: 0.9375rem; }
+
+  .tries { width: 100%; border-collapse: collapse; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+  .tries th { text-align: left; font-weight: 600; color: var(--muted); padding: 0 10px 6px 0; border-bottom: 1px solid var(--line); }
+  .tries td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tries td small { color: var(--muted); }
+  .tries tr.latest td { font-weight: 700; }
+  .tr-acc { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+  .tries-wrap { overflow-x: auto; }
+
+  @media (min-width: 37.5em) {
+    .analysis { padding: 28px 32px 32px; }
+    .tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .tile, .tile:nth-child(odd) { border-left: 1px solid var(--line); padding-left: 16px; }
+    .tile:first-child { border-left: 0; padding-left: 0; }
+    .tile:nth-child(n+3) { border-top: 0; }
+  }
+  @media (min-width: 56.25em) {
+    .two { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; }
+  }
+  @media (orientation: landscape) and (max-height: 38.75em) and (min-width: 30em) {
+    .analysis { grid-column: 1 / -1; }
+  }
+
+  /* practice / test switch */
+  .modes { flex: none; display: inline-flex; padding: 3px; border-radius: 99px; background: #dfe4ec; }
+  .modes button { border: 0; background: transparent; border-radius: 99px; padding: 6px 14px; font-size: 0.9375rem; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .modes button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, .15); }
+  .mode-note { margin: 0; font-size: 0.875rem; color: var(--muted); }
+  @media (max-width: 30em) {
+    .modes button { padding: 5px 10px; font-size: 0.875rem; }
+    .tools-btn { padding: 6px 12px; font-size: 0.875rem; }
+    .bar { gap: 6px; }
+  }
+
+  .lead { margin: 0; max-width: 640px; font-size: 1.0625rem; color: var(--text); text-wrap: pretty; }
+  .score-line { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 0; font-size: 0.9375rem; color: var(--muted); }
+  .score-line b { color: var(--text); font-size: 1.0625rem; }
+  .reviewed { display: inline-block; font-size: 0.8125rem; font-weight: 600; color: var(--ink); background: #e6ecf8; border-radius: 99px; padding: 2px 10px; }
+
+  /* tap a marked word */
+  .wordpop { position: fixed; z-index: 6; width: min(300px, calc(100vw - 16px)); padding: 12px 14px; border-radius: 12px; background: var(--paper);
+             box-shadow: 0 10px 30px rgba(15, 23, 42, .2), 0 0 0 1px #e5e8ee; display: grid; gap: 6px; font-size: 0.9375rem; }
+  .wordpop .wp-word { font-size: 1.125rem; font-weight: 700; }
+  .wordpop .wp-close { position: absolute; top: 4px; right: 4px; width: 36px; height: 36px; border: 0; background: transparent; font-size: 1.375rem; color: var(--muted); cursor: pointer; border-radius: 50%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.8125rem; font-weight: 600; border-radius: 99px; padding: 2px 10px; background: #eef1f6; color: var(--text); }
+  .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .9; }
+  .chip.skip, .chip.change, .chip.added { background: var(--fix-soft); color: var(--fix-ink); }
+  .chip.tip, .chip.selfc { background: var(--tip-soft); color: #7a3a8f; }
+  .chip.unclear { background: #eef0f3; color: #4c5566; }
+  .chip.m-changes { background: #fff; color: var(--fix-ink); box-shadow: inset 0 0 0 1px #ecd2a6; }
+  .chip.m-changes::before, .chip.m-same::before { display: none; }
+  .chip.m-same { background: #fff; color: var(--muted); box-shadow: inset 0 0 0 1px #dfe4ec; }
+  .play-btn { justify-self: start; border: 1px solid var(--edge); background: var(--paper); border-radius: 99px; padding: 6px 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
+
+  /* words to check */
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .checks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e5e8ee; }
+  .checks li:first-child { padding-top: 0; }
+  .checks .c-word { font-weight: 700; }
+  .checks .c-detail { grid-column: 1 / -1; font-size: 0.875rem; color: var(--muted); }
+  .checks .play-btn { padding: 4px 12px; font-size: 0.875rem; }
+  .info-row { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 12px 0 0; font-size: 0.875rem; color: var(--muted); }
+  .info-row b { color: var(--text); }
+  .tips li.good { list-style: none; margin-left: -1.2em; color: var(--ink); }
+  .tips li.good::before { content: "✓ "; font-weight: 700; }
+  .tl-stop { position: absolute; top: 10px; height: 16px; border-radius: 4px; background: #dbe4f7; }
+  .sw.stop { background: #dbe4f7; }
+
+  /* questions after reading */
+  .quiz { margin-top: calc(var(--controls-gap) + 12px); background: var(--paper); border-radius: 4px; padding: 22px 16px 24px;
+          box-shadow: 0 1px 0 #d5dbe5, 0 12px 30px -18px rgba(30, 58, 138, .35); }
+  .quiz h2 { margin: 0 0 4px; font-size: var(--fs-verdict); color: var(--ink); }
+  .quiz > p { margin: 0 0 16px; color: var(--muted); font-size: 0.9375rem; }
+  .quiz fieldset { border: 0; margin: 0 0 18px; padding: 0; }
+  .quiz legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+  .quiz label { display: flex; gap: 10px; align-items: center; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--edge); border-radius: 10px; cursor: pointer; }
+  .quiz input { width: 20px; height: 20px; margin: 0; accent-color: var(--ink); flex: none; }
+  .quiz label.right { border-color: var(--read); background: #eef2fb; }
+  .quiz label.wrong-pick { border-color: var(--fix); background: var(--fix-soft); }
+  .quiz .q-result { font-weight: 700; color: var(--ink); margin: 4px 0 0; }
+  .primary-btn { border: 0; background: var(--ink); color: #fff; border-radius: 99px; padding: 10px 22px; font-weight: 700; cursor: pointer; }
+  .primary-btn:disabled { background: #a7b0bf; cursor: default; }
+  @media (min-width: 37.5em) { .quiz { padding: 28px 32px 32px; } }
+  @media (orientation: landscape) and (max-height: 38.75em) and (min-width: 30em) { .quiz { grid-column: 1 / -1; } }
+
+  /* teacher review */
+  dialog.review { border: 0; padding: 0; width: min(760px, 100%); max-width: 100%; max-height: 100%; height: 100%; margin: 0 auto;
+                  background: var(--paper); color: var(--text); overscroll-behavior: contain; }
+  @media (min-width: 48em) { dialog.review { height: auto; max-height: calc(100% - 48px); margin: 24px auto; border-radius: 14px; } }
+  dialog.review::backdrop { background: rgba(15, 23, 42, .35); }
+  .rv-inner { padding: 0 22px 28px; display: grid; gap: 22px; }
+  .rv-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+             margin: 0 -22px; padding: 12px 12px 10px 22px; background: var(--paper); border-bottom: 1px solid #e5e8ee; }
+  .rv-head h2 { margin: 0; font-size: 1.25rem; }
+  .rv-marks { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .rv-marks label { display: grid; gap: 4px; font-size: 0.875rem; font-weight: 600; color: var(--muted); }
+  .rv-marks select, .rv-words select, .rv-note { font: inherit; border: 1px solid var(--edge); border-radius: 10px; padding: 8px 10px; background: #fff; color: var(--text); }
+  .rv-total { font-size: 1.125rem; font-weight: 700; color: var(--ink); }
+  .rv-words { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  .rv-words th { text-align: left; font-size: 0.8125rem; color: var(--muted); font-weight: 600; padding: 0 8px 6px 0; border-bottom: 1px solid #e5e8ee; }
+  .rv-words td { padding: 6px 8px 6px 0; border-bottom: 1px solid #f0f2f6; vertical-align: middle; }
+  .rv-words tr.changed td:first-child { box-shadow: inset 3px 0 0 var(--ink); padding-left: 8px; }
+  .rv-words .rv-play { border: 0; background: transparent; color: var(--ink); font-weight: 700; cursor: pointer; padding: 4px 6px; }
+  .rv-note { width: 100%; min-height: 70px; resize: vertical; }
+  .rv-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .rv-saved { font-size: 0.875rem; color: var(--ink); font-weight: 600; }
 
   /* test tools panel: full screen on phones, a side sheet from 420px wide */
   dialog.tools { border: 0; padding: 0; margin: 0 0 0 auto; width: 100%; width: min(420px, 100%); max-width: 100%; height: 100%; max-height: 100%;
@@ -156,7 +326,7 @@
   .engine p { margin: 0 0 6px; overflow-wrap: anywhere; }
   .engine table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; }
   .engine td, .engine th { border-bottom: 1px solid #e5e8ee; padding: 4px 6px 4px 0; text-align: left; }
-  .engine .lowc { color: var(--pen); font-weight: 700; }
+  .engine .lowc { color: var(--fix-ink); font-weight: 700; }
 
   /* mouse vs touch */
   @media (hover: hover) {
@@ -198,7 +368,11 @@
   <div class="picker">
     <select id="passageSelect" aria-label="Choose a passage"></select>
   </div>
-  <button class="tools-btn" id="toolsBtn" type="button">Test tools</button>
+  <div class="modes" role="group" aria-label="Practice or test">
+    <button type="button" id="modePractice" aria-pressed="true">Practice</button>
+    <button type="button" id="modeTest" aria-pressed="false">Test</button>
+  </div>
+  <button class="tools-btn" id="toolsBtn" type="button">Tools</button>
 </header>
 
 <main>
@@ -210,32 +384,92 @@
 
   <section class="controls" aria-live="polite">
     <p id="verdict" class="verdict"></p>
-    <p id="stats" class="stats" hidden></p>
+    <p id="lead" class="lead" hidden></p>
+    <p id="scoreLine" class="score-line" hidden></p>
     <button id="mic" class="mic" type="button" disabled aria-label="Start reading">
       <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon">
         <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
       </svg>
     </button>
     <div id="micLabel" class="mic-label">Getting the listener ready…</div>
+    <p id="modeNote" class="mode-note"></p>
     <div id="after" class="after" hidden>
       <button id="playAll" class="ghost" type="button">Hear my reading</button>
+      <button id="reviewBtn" class="ghost" type="button">Teacher review</button>
     </div>
     <p id="key" class="key" hidden>
-      <span><span class="k">—</span> missed</span>
-      <span><span class="k">〰</span> read differently (tap to hear)</span>
-      <span><span class="k">‸</span> added word</span>
+      <span class="chip skip">Skipped</span>
+      <span class="chip change">Changed</span>
+      <span class="chip added">Added ^</span>
+      <span class="chip tip">Sound tip</span>
+      <span class="chip unclear">Unclear</span>
+      <span>Tap a marked word to see more.</span>
     </p>
     <p id="note" class="note" hidden></p>
   </section>
+
+  <section id="quiz" class="quiz" hidden aria-labelledby="quizTitle">
+    <h2 id="quizTitle">Did you understand?</h2>
+    <p>Answer these questions about the passage.</p>
+    <form id="quizForm"></form>
+  </section>
+
+  <section id="analysis" class="analysis" hidden aria-labelledby="anTitle">
+    <h2 id="anTitle">Reading analysis</h2>
+    <div class="tiles" id="tiles"></div>
+    <p class="info-row" id="infoRow"></p>
+
+    <div id="practiceOnly">
+      <div class="two">
+        <div class="block">
+          <h3>Words to check</h3>
+          <ul class="checks" id="checks"></ul>
+        </div>
+        <div class="block">
+          <h3>What to practise</h3>
+          <ul class="tips" id="tips"></ul>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3>Reading timeline</h3>
+        <div class="tl-legend" aria-hidden="true">
+          <span><i class="sw read"></i> Read correctly</span>
+          <span><i class="sw change"></i> Changed</span>
+          <span><i class="sw extra"></i> Added</span>
+          <span><i class="sw tip"></i> Sound tip</span>
+          <span><i class="sw unclear"></i> Unclear</span>
+          <span><i class="sw repeat"></i> Repeated or fixed</span>
+          <span><i class="sw stop"></i> Pause at punctuation</span>
+          <span><i class="sw pause"></i> Pause mid-phrase</span>
+        </div>
+        <div class="timeline" id="timeline"></div>
+        <div class="tl-axis" id="tlAxis"></div>
+        <p class="tl-hint">Each block is one spoken word; its width is how long it took. Tap a block to see the word.</p>
+      </div>
+
+      <div class="block">
+        <h3>Sentence by sentence</h3>
+        <ol class="sentences" id="sentences"></ol>
+      </div>
+    </div>
+
+    <div class="block">
+      <h3>Tries on this passage</h3>
+      <div class="tries-wrap"><table class="tries" id="tries"></table></div>
+    </div>
+  </section>
 </main>
+<div id="tlTip" class="tl-tip" role="tooltip" hidden></div>
+<div id="wordPop" class="wordpop" role="dialog" aria-label="About this word" hidden></div>
 
 <audio id="playback" preload="auto"></audio>
 
 <dialog id="tools" class="tools" aria-labelledby="toolsTitle">
   <div class="tools-inner">
     <div class="tools-head">
-      <h2 id="toolsTitle">Test tools</h2>
-      <button class="close" id="toolsClose" type="button" aria-label="Close test tools">×</button>
+      <h2 id="toolsTitle">Tools</h2>
+      <button class="close" id="toolsClose" type="button" aria-label="Close tools">×</button>
     </div>
 
     <div class="field">
@@ -249,8 +483,9 @@
       <select id="mode">
         <option value="sentences">Passage sentences + words (best in tests)</option>
         <option value="words">Passage words only</option>
-        <option value="open">Open listening (any English word)</option>
+        <option value="open">Open listening only (no second pass)</option>
       </select>
+      <p>A second, open-listening pass always runs alongside the first two modes. It checks how clearly each word was said.</p>
     </div>
 
     <div class="field">
@@ -265,6 +500,13 @@
       <label class="filebtn">Choose audio file<input type="file" id="fileInput" accept="audio/*" hidden></label>
     </div>
 
+    <div class="field">
+      <span class="lbl">Teacher reviews</span>
+      <p id="reviewCount">No reviews saved yet.</p>
+      <p><button type="button" class="filebtn" id="downloadReviews">Download reviews (JSON)</button></p>
+      <p>Each review keeps the tool's marks next to the teacher's, so the scoring can be tuned. Recordings are not saved.</p>
+    </div>
+
     <div class="field engine">
       <span class="lbl">Engine details</span>
       <div id="engineInfo"><p>No reading checked yet.</p></div>
@@ -272,57 +514,96 @@
   </div>
 </dialog>
 
+<dialog id="review" class="review" aria-labelledby="rvTitle">
+  <div class="rv-inner">
+    <div class="rv-head">
+      <h2 id="rvTitle">Teacher review</h2>
+      <button class="close" id="rvClose" type="button" aria-label="Close teacher review">×</button>
+    </div>
+    <div>
+      <audio id="rvAudio" controls preload="auto" style="width:100%"></audio>
+    </div>
+    <div>
+      <div class="rv-marks">
+        <label>Accuracy (out of 4)<select id="rvAcc"></select></label>
+        <label>Pace (out of 3)<select id="rvPace"></select></label>
+        <label>Phrasing (out of 3)<select id="rvPhr"></select></label>
+      </div>
+      <p class="rv-total" id="rvTotal"></p>
+    </div>
+    <div>
+      <h3 style="margin:0 0 8px">Words</h3>
+      <label class="followalong"><input type="checkbox" id="rvAll"> Show every word, not just the marked ones</label>
+      <table class="rv-words" id="rvWords"></table>
+    </div>
+    <label class="field"><span class="lbl">Note for the learner or the team</span><textarea class="rv-note" id="rvNote"></textarea></label>
+    <div class="rv-actions">
+      <button type="button" class="primary-btn" id="rvSave">Save review</button>
+      <span class="rv-saved" id="rvSaved"></span>
+    </div>
+  </div>
+</dialog>
+
 <script src="lib/vosk.js"></script>
+<script src="js/scoring.js"></script>
 <script>
+const RS = window.ReadingScore;
 const MODEL_URL = 'models/en-in.tar.gz';
-const UNSURE_CONF = 0.5; // a mismatch below this confidence is shown as "unsure", not counted as a mistake
 
 const PASSAGES = [
-  { title: 'Morning Walk',
-    text: 'Every morning my grandmother and I go for a walk in the park. We look at the birds, the trees and the flowers. On the way home, we buy fresh fruit from the market.' },
-  { title: 'A Good Listener',
-    text: 'A good listener looks at the speaker and waits for their turn to talk. They ask questions when they do not understand. Listening carefully helps us speak with confidence.' },
-  { title: 'My own passage', text: 'Type your passage in Test tools.' },
+  { id: 'morning-walk', title: 'Morning Walk',
+    text: 'Every morning my grandmother and I go for a walk in the park. We look at the birds, the trees and the flowers. On the way home, we buy fresh fruit from the market.',
+    questions: [
+      { q: 'Who goes for a walk every morning?', options: ['The writer and their grandmother', 'The writer and a friend', 'Only the grandmother'], answer: 0 },
+      { q: 'Where do they walk?', options: ['In the market', 'In the park', 'In the garden'], answer: 1 },
+      { q: 'What do they buy on the way home?', options: ['Vegetables', 'Flowers', 'Fresh fruit'], answer: 2 },
+    ] },
+  { id: 'good-listener', title: 'A Good Listener',
+    text: 'A good listener looks at the speaker and waits for their turn to talk. They ask questions when they do not understand. Listening carefully helps us speak with confidence.',
+    questions: [
+      { q: 'What does a good listener look at?', options: ['The speaker', 'The floor', 'A book'], answer: 0 },
+      { q: 'What do they do when they do not understand?', options: ['Stay quiet', 'Ask questions', 'Start talking'], answer: 1 },
+      { q: 'What does listening carefully help us do?', options: ['Read faster', 'Write neatly', 'Speak with confidence'], answer: 2 },
+    ] },
+  { id: 'own', title: 'My own passage', text: 'Type your passage in Tools.' },
 ];
 
 // Synthetic test recordings (macOS "Aman" Indian English voice) with known, deliberate mistakes.
 const SAMPLES = [
   { file: 'samples/p1-correct.wav', passage: 0, label: 'Morning Walk, read correctly',
-    expect: 'This sample was read perfectly. It should score 100%.' },
+    expect: 'Read perfectly. It should get full marks for accuracy.' },
   { file: 'samples/p1-skipped.wav', passage: 0, label: 'Morning Walk, 4 words skipped',
-    expect: 'This sample skips "my", "the trees" and "fresh". It should show 4 missed.' },
-  { file: 'samples/p1-wrong.wav', passage: 0, label: 'Morning Walk, 2 words swapped',
-    expect: 'This sample says "garden" for "park" and "vegetables" for "fruit". Both should be marked.' },
-  { file: 'samples/p2-extra.wav', passage: 1, label: 'A Good Listener, 2 extra words',
-    expect: 'This sample adds "the" ("at the the speaker") and "many" ("ask many questions"). Both should show as added.' },
+    expect: 'Skips "my", "the trees" and "fresh". "Trees" and "fresh" change the meaning; "my" and "the" do not.' },
+  { file: 'samples/p1-wrong.wav', passage: 0, label: 'Morning Walk, 2 words changed',
+    expect: 'Says "garden" for "park" and "vegetables" for "fruit". Both change the meaning and should come first.' },
+  { file: 'samples/p1-endings.wav', passage: 0, label: 'Morning Walk, dropped "-s" endings',
+    expect: 'Says "bird", "tree" and "flower" for "birds", "trees" and "flowers". It should name the "-s" pattern in one line.' },
+  { file: 'samples/p2-extra.wav', passage: 1, label: 'A Good Listener, a repeat and an added word',
+    expect: 'Repeats "the" ("at the the speaker", not a mistake) and adds "many" ("ask many questions").' },
+  { file: 'samples/p2-selfcorrect.wav', passage: 1, label: 'A Good Listener, fixes a word',
+    expect: 'Says "question… questions" and repeats "listening carefully". Neither should count as a mistake.' },
+  { file: 'samples/p2-hesitant.wav', passage: 1, label: 'A Good Listener, 2 pauses mid-phrase',
+    expect: 'Stops for about 1.4 s before "speaker" and 1.1 s before "not". Phrasing should drop.' },
+  { file: 'samples/p1-wordbyword.wav', passage: 0, label: 'Morning Walk, one word at a time',
+    expect: 'Reads with a short gap after every word. It should say the reading is word by word.' },
 ];
 
+const TYPE_LABEL = { skip: 'Skipped', change: 'Changed', added: 'Added', unclear: 'Unclear', tip: 'Sound tip', selfc: 'Fixed it yourself' };
+const MEANING_LABEL = { changes: 'Changes the meaning', same: 'Meaning stays the same', small: 'Small change' };
+const PACE_LABEL = { good: 'Comfortable', slow: 'A bit slow', fast: 'A bit fast' };
+
 const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
 let model = null, audioCtx = null, rec = null, modelLoadMs = 0, busy = false;
+let appMode = store.get('rc-mode', 'practice');
+let current = null; // the last checked reading
 
-// ---------- text helpers ----------
-const norm = w => w.toLowerCase().replace(/[‘’`]/g, "'").replace(/[^a-z0-9']/g, '').replace(/^'+|'+$/g, '');
-const tokenize = text => text.split(/\s+/).map(raw => ({ raw, n: norm(raw) })).filter(t => t.n);
-
-// Word-level edit-distance alignment between expected words (ref) and heard words (hyp).
-function align(ref, hyp) {
-  const R = ref.length, H = hyp.length;
-  const d = Array.from({ length: R + 1 }, () => new Int32Array(H + 1));
-  for (let i = 0; i <= R; i++) d[i][0] = i;
-  for (let j = 0; j <= H; j++) d[0][j] = j;
-  for (let i = 1; i <= R; i++) for (let j = 1; j <= H; j++) {
-    const same = ref[i - 1] === hyp[j - 1].word;
-    d[i][j] = Math.min(d[i - 1][j - 1] + (same ? 0 : 1), d[i - 1][j] + 1, d[i][j - 1] + 1);
-  }
-  const ops = []; let i = R, j = H;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && ref[i - 1] === hyp[j - 1].word && d[i][j] === d[i - 1][j - 1]) { ops.push({ t: 'ok', r: i - 1, h: j - 1 }); i--; j--; }
-    else if (i > 0 && j > 0 && d[i][j] === d[i - 1][j - 1] + 1) { ops.push({ t: 'sub', r: i - 1, h: j - 1 }); i--; j--; }
-    else if (i > 0 && d[i][j] === d[i - 1][j] + 1) { ops.push({ t: 'del', r: i - 1 }); i--; }
-    else { ops.push({ t: 'ins', h: j - 1 }); j--; }
-  }
-  return ops.reverse();
-}
+const passage = () => PASSAGES[$('passageSelect').value] || PASSAGES[0];
+const passageText = () => $('passageText').value;
 
 // ---------- recognition session ----------
 // vosk-browser posts exactly one message per audio chunk, plus one for retrieveFinalResult,
@@ -357,18 +638,40 @@ function makeSession(sampleRate, grammarWords, onProgress) {
   };
 }
 
-// sentences: whole passage sentences (strong expectation of order) + single words (so skips still show)
-// words: single passage words only (no order). Tested worse: confuses short words like "and"/"in"
-// open: full model vocabulary. Catches extra words, but more false alarms ("park" heard as "part")
-function grammarFor(tokens) {
+// Two passes over the same audio: the passage pass (timing, which word was read) and an open pass
+// (what was actually said: clarity, accents, words that are not in the passage).
+function makeSessions(sampleRate, onProgress) {
   const mode = $('mode').value;
-  if (mode === 'open') return null;
-  const words = tokens.map(t => t.n);
-  if (mode === 'words') return words;
-  const sentences = $('passageText').value.split(/[.!?]+/).map(s => tokenize(s).map(t => t.n).join(' ')).filter(Boolean);
-  return [...sentences, ...words];
+  const primary = makeSession(sampleRate, RS.grammarFor(passageText(), mode), onProgress);
+  const open = mode === 'open' ? null : makeSession(sampleRate, null);
+  const loud = loudnessTracker(sampleRate);
+  return {
+    feed(f32, sr) { loud.push(f32); primary.feed(f32, sr); if (open) open.feed(f32.slice(), sr); },
+    async finish() { const [p, o] = await Promise.all([primary.finish(), open ? open.finish() : null]); return { primary: p, open: o, silences: loud.silences() }; },
+  };
 }
-const passageTokens = () => tokenize($('passageText').value);
+
+// Loudness in 20 ms slices, kept while listening, so pauses can be measured from the audio itself:
+// the engine's word times run into each other and hide short silences.
+function loudnessTracker(sampleRate) {
+  const frame = Math.round(sampleRate * 0.02), rms = [];
+  let sum = 0, n = 0;
+  return {
+    push(f32) { for (let i = 0; i < f32.length; i++) { sum += f32[i] * f32[i]; if (++n === frame) { rms.push(Math.sqrt(sum / frame)); sum = 0; n = 0; } } },
+    silences() {
+      if (rms.length < 10) return [];
+      const sorted = [...rms].sort((a, b) => a - b), pick = p => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+      const floor = pick(0.1), loudest = pick(0.95), threshold = floor + (loudest - floor) * 0.1;
+      const out = []; let from = null;
+      rms.forEach((v, i) => {
+        if (v < threshold) { if (from === null) from = i; }
+        else if (from !== null) { out.push({ from: from * 0.02, to: i * 0.02 }); from = null; }
+      });
+      if (from !== null) out.push({ from: from * 0.02, to: rms.length * 0.02 });
+      return out;
+    },
+  };
+}
 
 // ---------- screen state ----------
 function setMic(state, label, isErr) {
@@ -383,44 +686,37 @@ function setMic(state, label, isErr) {
   $('micLabel').classList.toggle('err', !!isErr);
 }
 
+function setAppMode(m) {
+  if (rec) return;
+  appMode = m; store.set('rc-mode', m);
+  $('modePractice').setAttribute('aria-pressed', m === 'practice');
+  $('modeTest').setAttribute('aria-pressed', m === 'test');
+  $('modeNote').textContent = m === 'practice'
+    ? 'Practice: words light up as you read, and you get hints afterwards.'
+    : 'Test: no help while you read. You see your score at the end.';
+  if (current) showCurrent(); else renderPassage();
+}
+
 function clearResult() {
-  $('grade').hidden = true; $('verdict').textContent = ''; $('stats').hidden = true;
-  $('after').hidden = true; $('key').hidden = true; $('note').hidden = true;
+  for (const id of ['grade', 'lead', 'scoreLine', 'after', 'key', 'note', 'analysis', 'quiz', 'tlTip', 'wordPop']) $(id).hidden = true;
+  $('verdict').textContent = '';
 }
 
 function renderPassage() {
-  const sel = PASSAGES[$('passageSelect').value];
-  $('pageTitle').textContent = sel ? sel.title : '';
-  const tokens = $('passageText').value.split(/\s+/).filter(Boolean);
+  $('pageTitle').textContent = passage().title;
+  const tokens = passageText().split(/\s+/).filter(Boolean);
   $('passage').innerHTML = tokens.map(t => `<span class="w">${esc(t)}</span>`).join(' ');
-  liveSpans = [...$('passage').querySelectorAll('.w')].filter(s => norm(s.textContent));
+  $('passage').classList.remove('plain');
+  liveSpans = [...$('passage').querySelectorAll('.w')].filter(s => RS.norm(s.textContent));
   clearResult();
 }
 
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
-
-// ---------- live follow-along ----------
-// Find how far into the passage the learner has got: the passage prefix that best matches
-// everything heard so far (smallest word edit distance; on a tie, prefer the further position).
-function livePosition(refN, heard) {
-  const H = heard.length; if (!H) return -1;
-  let prev = new Int32Array(H + 1), cur = new Int32Array(H + 1);
-  for (let j = 0; j <= H; j++) prev[j] = j;
-  let best = prev[H], bestI = 0;
-  for (let i = 1; i <= refN.length; i++) {
-    cur[0] = i;
-    for (let j = 1; j <= H; j++) cur[j] = Math.min(prev[j - 1] + (refN[i - 1] === heard[j - 1] ? 0 : 1), prev[j] + 1, cur[j - 1] + 1);
-    if (cur[H] <= best) { best = cur[H]; bestI = i; }
-    [prev, cur] = [cur, prev];
-  }
-  return bestI - 1;
-}
-
+// ---------- live follow-along (practice only) ----------
 // Same query as the side-by-side layout in the CSS: there the controls sit beside the page, not below it.
 const SIDE_BY_SIDE = matchMedia('(orientation: landscape) and (max-height: 38.75em) and (min-width: 30em)');
 let liveSpans = [], liveRef = [], livePos = -1;
 function followAlong(heard) {
-  const pos = livePosition(liveRef, heard.map(w => (w === '[unk]' ? w : norm(w))));
+  const pos = RS.livePosition(liveRef, heard.map(w => (w === '[unk]' ? w : RS.norm(w))));
   if (pos === livePos) return;
   livePos = pos;
   liveSpans.forEach((s, i) => { s.classList.toggle('done', i < pos); s.classList.toggle('here', i === pos); });
@@ -436,8 +732,7 @@ function followAlong(heard) {
 // ---------- live listening (microphone, or a sample played aloud in real time) ----------
 let meterRaf = 0;
 async function startMic() {
-  const tokens = passageTokens();
-  if (!tokens.length) { setMic('idle', 'Add a passage in Test tools first.', true); return; }
+  if (!RS.tokenize(passageText()).length) { setMic('idle', 'Add a passage in Tools first.', true); return; }
   audioCtx = audioCtx || new AudioContext();
   await audioCtx.resume();
   let stream;
@@ -447,27 +742,27 @@ async function startMic() {
     setMic('idle', 'The microphone is blocked. Allow microphone access for this page, then tap again.', true);
     return;
   }
-  startLive({ stream, tokens });
+  startLive({ stream });
 }
 
 async function playSampleLive(arrayBuffer, playUrl, expectText) {
-  const tokens = passageTokens();
-  if (!tokens.length || rec || busy) return;
+  if (!RS.tokenize(passageText()).length || rec || busy) return;
   audioCtx = audioCtx || new AudioContext();
   await audioCtx.resume();
   const buffer = await audioCtx.decodeAudioData(arrayBuffer);
-  startLive({ buffer, tokens, playUrl, expectText });
+  startLive({ buffer, playUrl, expectText });
 }
 
-function startLive({ stream, buffer, tokens, playUrl, expectText }) {
+function startLive({ stream, buffer, playUrl, expectText }) {
+  current = null;
   renderPassage();
-  liveRef = tokens.map(t => t.n); livePos = -1;
-  const session = makeSession(audioCtx.sampleRate, grammarFor(tokens), followAlong);
+  liveRef = RS.tokenize(passageText()).map(t => t.n); livePos = -1;
+  const sessions = makeSessions(audioCtx.sampleRate, appMode === 'practice' ? followAlong : null);
   let src;
   if (stream) src = audioCtx.createMediaStreamSource(stream);
   else { src = audioCtx.createBufferSource(); src.buffer = buffer; src.connect(audioCtx.destination); src.onended = () => stopMic(); }
   const node = audioCtx.createScriptProcessor(4096, 1, 1);
-  node.onaudioprocess = e => session.feed(e.inputBuffer.getChannelData(0).slice(), audioCtx.sampleRate);
+  node.onaudioprocess = e => sessions.feed(e.inputBuffer.getChannelData(0).slice(), audioCtx.sampleRate);
   src.connect(node); node.connect(audioCtx.destination);
   const analyser = audioCtx.createAnalyser(); analyser.fftSize = 512; src.connect(analyser);
   const buf = new Float32Array(analyser.fftSize);
@@ -480,9 +775,10 @@ function startLive({ stream, buffer, tokens, playUrl, expectText }) {
   meter();
   let mr = null; const chunks = [];
   if (stream) { mr = new MediaRecorder(stream); mr.ondataavailable = e => chunks.push(e.data); mr.start(); }
-  rec = { stream, src, node, analyser, mr, chunks, session, tokens, playUrl, expectText, startedAt: performance.now() };
+  rec = { stream, src, node, analyser, mr, chunks, sessions, playUrl, expectText, startedAt: performance.now() };
   if (!stream) src.start();
-  setMic('recording', stream ? 'Listening… tap to stop when you finish' : 'Playing the sample… tap to stop');
+  const hint = appMode === 'test' ? 'Test: read the whole passage, then tap stop' : 'Listening… tap to stop when you finish';
+  setMic('recording', stream ? hint : 'Playing the sample… tap to stop');
 }
 
 async function stopMic() {
@@ -498,94 +794,397 @@ async function stopMic() {
   }
   setMic('busy', 'Checking your reading…');
   const t0 = performance.now();
-  const words = await r.session.finish();
+  const heard = await r.sessions.finish();
   const waitSec = (performance.now() - t0) / 1000;
-  showResults(r.tokens, words, { audioSec: elapsed, speed: `Result ready ${waitSec.toFixed(2)} s after reading stopped.` }, playUrl, r.expectText);
+  showResults(heard, { audioSec: elapsed, source: r.stream ? 'mic' : 'sample', speed: `Result ready ${waitSec.toFixed(2)} s after reading stopped.` }, playUrl, r.expectText);
 }
 
 // ---------- recorded file ----------
 async function runAudio(arrayBuffer, playUrl, expectText) {
-  const tokens = passageTokens();
-  if (!tokens.length || busy) return;
-  busy = true; renderPassage(); setMic('busy', 'Checking the recording…');
+  if (!RS.tokenize(passageText()).length || busy) return;
+  busy = true; current = null; renderPassage(); setMic('busy', 'Checking the recording…');
   audioCtx = audioCtx || new AudioContext();
   const audio = await audioCtx.decodeAudioData(arrayBuffer);
   const data = audio.getChannelData(0), sr = audio.sampleRate;
-  const session = makeSession(sr, grammarFor(tokens));
+  const sessions = makeSessions(sr, null);
   const t0 = performance.now();
-  for (let i = 0; i < data.length; i += 4096) session.feed(data.slice(i, i + 4096), sr);
-  const words = await session.finish();
+  for (let i = 0; i < data.length; i += 4096) sessions.feed(data.slice(i, i + 4096), sr);
+  const heard = await sessions.finish();
   const procSec = (performance.now() - t0) / 1000;
-  showResults(tokens, words, { audioSec: audio.duration,
-    speed: `Checked ${audio.duration.toFixed(1)} s of audio in ${procSec.toFixed(2)} s (${(procSec / audio.duration).toFixed(2)}× real time; under 1× can keep up live).` },
+  showResults(heard, { audioSec: audio.duration, source: expectText ? 'sample' : 'file',
+    speed: `Checked ${audio.duration.toFixed(1)} s of audio, both passes, in ${procSec.toFixed(2)} s (${(procSec / audio.duration).toFixed(2)}× real time; under 1× can keep up live).` },
     playUrl, expectText);
   busy = false;
 }
 
 // ---------- results ----------
-function showResults(tokens, words, info, playUrl, expectText) {
-  const hyp = words.map(w => ({ ...w, word: w.word === '[unk]' ? '[unk]' : norm(w.word) })).filter(w => w.word);
-  const ops = align(tokens.map(t => t.n), hyp);
-  const spans = [...$('passage').querySelectorAll('.w')];
-  spans.forEach(s => s.classList.remove('done', 'here'));
-  // map normalised token index -> span (spans include tokens that normalise to nothing, e.g. "—")
-  const spanFor = []; spans.forEach(s => { if (norm(s.textContent)) spanFor.push(s); });
-  let ok = 0, miss = 0, wrong = 0, unsure = 0, extra = 0;
-  for (const op of ops) {
-    if (op.t === 'ok') { ok++; setTiming(spanFor[op.r], hyp[op.h]); }
-    else if (op.t === 'del') { miss++; spanFor[op.r].classList.add('miss'); spanFor[op.r].title = 'Missed'; }
-    else if (op.t === 'sub') {
-      const h = hyp[op.h], heard = h.word === '[unk]' ? '?' : h.word, s = spanFor[op.r];
-      if (h.conf < UNSURE_CONF) { unsure++; s.classList.add('unsure'); s.title = `Not sure: heard "${heard}"`; }
-      else { wrong++; s.classList.add('wrong'); s.dataset.note = heard; s.title = `Heard "${heard}"`; }
-      setTiming(s, h);
-    } else {
-      extra++;
-      const h = hyp[op.h], ins = document.createElement('span');
-      ins.className = 'ins'; ins.dataset.note = h.word === '[unk]' ? '?' : h.word; ins.title = 'Added word';
-      // insert before the next passage word, or at the end
-      const next = ops.slice(ops.indexOf(op) + 1).find(o => o.r !== undefined);
-      const anchor = next ? spanFor[next.r] : null;
-      if (anchor) anchor.before(ins); else $('passage').append(' ', ins);
-    }
-  }
-  const checked = tokens.length - unsure;
-  const acc = checked ? Math.round((ok / checked) * 100) : 0;
-  const speechSec = hyp.length ? Math.max(1, hyp[hyp.length - 1].end - hyp[0].start) : info.audioSec;
-  const wpm = Math.round(ok / (speechSec / 60));
-  const mistakes = miss + wrong;
-
-  const heardTooLittle = hyp.length < tokens.length * 0.3;
-  if (heardTooLittle) {
-    $('verdict').textContent = 'I could not hear enough. Try again a little louder.';
-  } else {
-    $('grade').textContent = acc + '%'; $('grade').hidden = false;
-    $('verdict').textContent = mistakes === 0 && extra === 0 ? 'Excellent reading!'
-      : acc >= 80 ? `Good try! Check the ${mistakes + extra} marked word${mistakes + extra === 1 ? '' : 's'} and read again.`
-      : 'Let\'s practise this passage again, slowly and clearly.';
-    $('stats').innerHTML = [
-      `<span><b>${ok}</b> of ${checked} words read</span>`,
-      `<span class="${miss ? 'bad' : ''}"><b>${miss}</b> missed</span>`,
-      `<span class="${wrong ? 'bad' : ''}"><b>${wrong}</b> read differently</span>`,
-      `<span class="${extra ? 'bad' : ''}"><b>${extra}</b> added</span>`,
-      `<span><b>${wpm}</b> words a minute</span>`,
-    ].join('');
-    $('stats').hidden = false;
-    $('key').hidden = !(miss || wrong || extra);
-  }
-  $('playback').src = playUrl || '';
-  $('after').hidden = !playUrl;
-  $('note').textContent = expectText || ''; $('note').hidden = !expectText;
+function showResults(heard, info, playUrl, expectText) {
+  const a = RS.analyse({ text: passageText(), primary: heard.primary, open: heard.open, silences: heard.silences });
+  current = { id: Date.now().toString(36), at: new Date().toISOString(), passageId: passage().id, title: passage().title, text: passageText(),
+              mode: appMode, source: info.source, analysis: a, playUrl, expectText, review: null, quiz: null };
+  if (!a.heardTooLittle) saveTry(current);
   setMic('idle', 'Tap to read again');
-  fitNotes();
+  showCurrent();
 
   $('engineInfo').innerHTML =
     `<p>Mode: ${esc($('mode').selectedOptions[0].text)}.</p><p>${esc(info.speed)} Engine loaded in ${(modelLoadMs / 1000).toFixed(1)} s.</p>` +
-    `<p>Heard: ${esc(hyp.map(w => w.word).join(' ') || '(nothing)')}</p>` +
-    '<table><tr><th>Heard</th><th>Confidence</th><th>Start (s)</th></tr>' +
-    hyp.map(w => `<tr><td>${esc(w.word)}</td><td class="${w.conf < UNSURE_CONF ? 'lowc' : ''}">${w.conf.toFixed(2)}</td><td>${w.start.toFixed(2)}</td></tr>`).join('') + '</table>';
-  window.__lastResult = { acc, ok, miss, wrong, unsure, extra, heard: hyp.map(w => w.word).join(' ') };
+    `<p>Passage pass heard: ${esc(heard.primary.map(w => w.word).join(' ') || '(nothing)')}</p>` +
+    (heard.open ? `<p>Open pass heard: ${esc(heard.open.map(w => w.word).join(' ') || '(nothing)')}</p>` : '') +
+    '<table><tr><th>Word</th><th>Status</th><th>Conf.</th><th>Open pass</th></tr>' +
+    a.words.map(w => `<tr><td>${esc(w.raw)}</td><td>${w.status}${w.selfCorrected ? ' (fixed)' : ''}</td><td class="${w.conf !== null && w.conf < RS.CONFIG.unsureConf ? 'lowc' : ''}">${w.conf === null ? '–' : w.conf.toFixed(2)}</td><td>${esc(w.openHeard ?? '')}</td></tr>`).join('') + '</table>';
+  window.__last = a;
 }
+
+function marksOf(c) {
+  const m = c.review ? c.review.marks : { accuracy: c.analysis.rubric.accuracy.marks, pace: c.analysis.rubric.pace.marks, phrasing: c.analysis.rubric.phrasing.marks };
+  return { ...m, total: RS.totalOf(m) };
+}
+
+function showCurrent() {
+  const c = current, a = c.analysis, practice = appMode === 'practice';
+  renderPassageMarks(a);
+  $('passage').classList.toggle('plain', !practice);
+  $('playback').src = c.playUrl || '';
+  $('after').hidden = !c.playUrl;
+  $('note').textContent = c.expectText || ''; $('note').hidden = !c.expectText;
+
+  if (a.heardTooLittle) {
+    $('verdict').textContent = 'I could not hear enough of the passage.';
+    $('lead').textContent = 'Hold the tablet closer and read a little louder, then try again.'; $('lead').hidden = false;
+    return;
+  }
+  const m = marksOf(c);
+  $('grade').innerHTML = `<span>${m.total}<small>/10</small></span>`; $('grade').hidden = false;
+  $('verdict').textContent = c.review ? 'Checked by your teacher' : a.message.headline;
+  $('lead').textContent = c.review ? (c.review.note || `Score: ${m.total} out of 10.`) : practice ? a.message.lead : 'Your reading has been scored. Your teacher can check it.';
+  $('lead').hidden = false;
+  $('scoreLine').innerHTML = `<span>Accuracy <b>${m.accuracy}/4</b></span><span>Pace <b>${m.pace}/3</b></span><span>Phrasing <b>${m.phrasing}/3</b></span>` +
+    `<span><b>${a.wcpm}</b> words a minute</span>` + (c.review ? '<span class="reviewed">Checked by teacher</span>' : '');
+  $('scoreLine').hidden = false;
+  $('key').hidden = !practice || !a.mistakes.length;
+  renderAnalysis(c);
+  renderQuiz(c);
+  fitNotes();
+}
+
+function renderPassageMarks(a) {
+  const spans = [...$('passage').querySelectorAll('.w')];
+  $('passage').querySelectorAll('.ins').forEach(e => e.remove());
+  const spanFor = spans.filter(s => RS.norm(s.textContent));
+  spans.forEach(s => { s.className = 'w'; delete s.dataset.note; delete s.dataset.i; s.removeAttribute('title'); s.style.removeProperty('--nudge'); });
+  for (const w of a.words) {
+    const s = spanFor[w.i]; if (!s) continue;
+    s.dataset.i = w.i;
+    if (w.status !== 'ok') s.classList.add(w.status);
+    else if (w.selfCorrected) { s.classList.add('selfc'); s.dataset.note = '✓ fixed'; }
+    if (w.status === 'change') s.dataset.note = w.heard;
+    if (w.status === 'tip' && w.soundedLike) s.dataset.note = '≈ ' + w.soundedLike;
+    s.title = w.status === 'ok' && !w.selfCorrected ? '' : TYPE_LABEL[w.selfCorrected && w.status === 'ok' ? 'selfc' : w.status];
+  }
+  a.extras.forEach((x, k) => {
+    if (x.kind !== 'added') return;
+    const ins = document.createElement('span');
+    ins.className = 'ins'; ins.dataset.note = x.word; ins.dataset.x = k; ins.title = 'Added word';
+    const anchor = x.before >= 0 ? spanFor[x.before] : null;
+    if (anchor) anchor.before(ins); else $('passage').append(' ', ins);
+  });
+}
+
+// ---------- word pop-up ----------
+function popFor(el) {
+  const a = current && current.analysis; if (!a || appMode !== 'practice') return;
+  let item;
+  if (el.dataset.x !== undefined) { const x = a.extras[+el.dataset.x]; item = { kind: 'added', word: x.word, meaning: x.meaning, start: x.start, end: x.end }; }
+  else {
+    const w = a.words[+el.dataset.i]; if (!w) return;
+    if (w.status === 'ok' && !w.selfCorrected) return;
+    item = w.status === 'ok' ? { kind: 'selfc', word: RS.clean(w.raw), heard: w.selfCorrected, start: w.start, end: w.end }
+      : a.mistakes.find(m => m.at === w.i && m.kind === w.status);
+    if (!item) return;
+    if (w.status === 'skip') { const nb = neighbourTimes(a, w.i); item = { ...item, start: nb[0], end: nb[1] }; }
+  }
+  const detail = item.kind === 'selfc' ? `You said “${item.heard}”, then fixed it to “${item.word}”. Great habit!` : cap(RS.describe(item));
+  const chips = `<span class="chip ${item.kind}">${TYPE_LABEL[item.kind]}</span>` + (MEANING_LABEL[item.meaning] ? `<span class="chip m-${item.meaning === 'changes' ? 'changes' : 'same'}">${MEANING_LABEL[item.meaning]}</span>` : '');
+  const canPlay = $('playback').src && item.start !== null && item.start !== undefined;
+  const pop = $('wordPop');
+  pop.innerHTML = `<button class="wp-close" type="button" aria-label="Close">×</button><div class="wp-word">${esc(item.word)}</div><div class="chips">${chips}</div><div>${esc(detail)}</div>` +
+    (canPlay ? `<button class="play-btn" type="button" data-s="${item.start}" data-e="${item.end}">▶ ${item.kind === 'skip' ? 'Hear this part' : 'Hear it'}</button>` : '');
+  pop.hidden = false;
+  const r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)) + 'px';
+  pop.style.top = (r.bottom + h + 12 < innerHeight ? r.bottom + 8 : Math.max(8, r.top - h - 8)) + 'px';
+  pop.querySelector('.wp-close').focus({ preventScroll: true });
+}
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+function neighbourTimes(a, i) {
+  let s = null, e = null;
+  for (let k = i - 1; k >= 0; k--) if (a.words[k].start !== null) { s = a.words[k].start; break; }
+  for (let k = i + 1; k < a.words.length; k++) if (a.words[k].end !== null) { e = a.words[k].end; break; }
+  return [s ?? (e !== null ? Math.max(0, e - 1.5) : null), e ?? (s !== null ? s + 1.5 : null)];
+}
+$('passage').addEventListener('click', e => { const el = e.target.closest('.w[data-i], .ins'); if (el) popFor(el); });
+$('wordPop').addEventListener('click', e => {
+  if (e.target.closest('.wp-close')) { $('wordPop').hidden = true; return; }
+  const b = e.target.closest('.play-btn'); if (b) playRange(+b.dataset.s, +b.dataset.e);
+});
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#wordPop, .w[data-i], .ins')) $('wordPop').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('wordPop').hidden = true; });
+addEventListener('scroll', () => { $('wordPop').hidden = true; $('tlTip').hidden = true; }, { passive: true });
+
+// ---------- analysis ----------
+function renderAnalysis(c) {
+  const a = c.analysis, m = marksOf(c), practice = appMode === 'practice';
+  const tile = (label, v, unit, sub) => `<div class="tile"><div class="t-l">${label}</div><div class="t-v">${v}<span>${unit}</span></div><div class="t-s">${sub}</div></div>`;
+  const midStops = a.pauses.hesitations.length + a.pauses.stuck.length;
+  $('tiles').innerHTML =
+    tile('Score', m.total, '/10', c.review ? 'Checked by teacher' : 'Accuracy + pace + phrasing') +
+    tile('Accuracy', m.accuracy, '/4', `${a.accuracy}% of words correct`) +
+    tile('Pace', m.pace, '/3', `${a.wcpm} words a minute, ${PACE_LABEL[a.rubric.pace.band].toLowerCase()} <small>(aim ${RS.CONFIG.paceTarget[0]}–${RS.CONFIG.paceTarget[1]})</small>`) +
+    tile('Phrasing', m.phrasing, '/3', [a.pauses.fullStops && `Paused at ${a.pauses.goodFull} of ${a.pauses.fullStops} full stops`, a.pauses.commas && `${a.pauses.goodComma} of ${a.pauses.commas} commas`, midStops ? `${midStops} mid-phrase` : 'none mid-phrase'].filter(Boolean).join(', '));
+  $('infoRow').innerHTML = [
+    `Reading speed <b>${a.wcpm}</b> words correct a minute (for information)`,
+    `Reading time <b>${a.readingSec.toFixed(1)} s</b>, first word to last`,
+    `Clearly spoken <b>${a.clarity}%</b> of words`,
+    `Words per phrase <b>${a.avgPhrase}</b>${a.wordByWord ? ' (word by word)' : ''}`,
+  ].map(s => `<span>${s}</span>`).join('');
+  $('practiceOnly').hidden = !practice;
+  if (practice) {
+    renderChecks(a); renderTips(c); renderTimeline(a); renderSentences(a);
+  }
+  renderTries();
+  $('analysis').hidden = false;
+}
+
+function renderChecks(a) {
+  const list = a.mistakes;
+  $('checks').innerHTML = list.length ? list.map(m => {
+    const canPlay = $('playback').src && m.start !== null && m.start !== undefined;
+    return `<li><span class="c-word">${esc(m.word)}</span>${canPlay ? `<button class="play-btn" type="button" data-s="${m.start}" data-e="${m.end}" aria-label="Hear ${esc(m.word)}">▶</button>` : '<span></span>'}
+      <div class="chips" style="grid-column:1/-1"><span class="chip ${m.kind}">${TYPE_LABEL[m.kind]}</span>${MEANING_LABEL[m.meaning] ? `<span class="chip m-${m.meaning === 'changes' ? 'changes' : 'same'}">${MEANING_LABEL[m.meaning]}</span>` : ''}</div>
+      <div class="c-detail">${esc(cap(RS.describe(m)))}</div></li>`;
+  }).join('') : '<li>No words to check. Every word was read correctly.</li>';
+}
+$('checks').addEventListener('click', e => { const b = e.target.closest('.play-btn'); if (b) playRange(+b.dataset.s, +b.dataset.e); });
+
+function renderTips(c) {
+  const a = c.analysis, items = [];
+  for (const p of a.patterns) items.push({ text: p.text });
+  if (a.rubric.pace.band === 'fast') items.push({ text: `You read fast (${a.wcpm} words a minute). Aim for ${RS.CONFIG.paceTarget[0]}–${RS.CONFIG.paceTarget[1]} so every word is clear.` });
+  if (a.rubric.pace.band === 'slow') items.push({ text: `You read slowly (${a.wcpm} words a minute). Read it again to make it smoother; aim for ${RS.CONFIG.paceTarget[0]}–${RS.CONFIG.paceTarget[1]}.` });
+  if (a.counts.selfCorrected) items.push({ good: true, text: `You fixed ${a.counts.selfCorrected} word${a.counts.selfCorrected === 1 ? '' : 's'} yourself straight away. Great habit, and it is not counted as a mistake.` });
+  if (a.pauses.fullStops >= 1 && a.pauses.goodFull === a.pauses.fullStops) items.push({ good: true, text: a.pauses.commas && a.pauses.goodComma === a.pauses.commas ? 'You paused at every comma and full stop.' : 'You paused at every full stop.' });
+  if (a.counts.repeats) items.push({ text: `You repeated ${a.counts.repeats} word${a.counts.repeats === 1 ? '' : 's'}. That is fine and not counted as a mistake, but try to keep going.` });
+  for (const s of a.pauses.stuck) items.push({ text: `You got stuck for ${s.gap.toFixed(1)} s before “${s.before}”. Practise that part.` });
+  if (!a.patterns.length && !a.mistakes.length) items.push({ good: true, text: 'No repeated mistakes. Well read!' });
+  const prev = loadTries().filter(t => t.id !== c.id).pop();
+  if (prev) { const d = marksOf(c).total - prev.total; items.push({ good: d > 0, text: d > 0 ? `Your score is up ${d} from your last try.` : d < 0 ? `Your score is ${-d} lower than your last try. Read it once more.` : 'Same score as your last try.' }); }
+  $('tips').innerHTML = items.map(t => `<li class="${t.good ? 'good' : ''}">${esc(t.text)}</li>`).join('');
+}
+
+function renderTimeline(a) {
+  const items = [
+    ...a.words.filter(w => w.start !== null).map(w => ({ start: w.start, end: w.end, cls: w.selfCorrected && w.status === 'ok' ? 'ok' : w.status === 'skip' ? 'ok' : w.status,
+      label: `“${RS.clean(w.raw)}”${w.status === 'change' ? `, read as “${w.heard}”` : w.status === 'tip' ? `, sounded like “${w.soundedLike}”` : ''}`,
+      type: w.status === 'ok' ? 'Read correctly' : TYPE_LABEL[w.status], conf: w.conf })),
+    ...a.extras.map(x => ({ start: x.start, end: x.end, cls: x.kind === 'added' ? 'extra' : x.kind === 'noise' ? 'noise' : 'repeat',
+      label: x.word === '[unk]' ? 'a sound' : `“${x.word}”`, type: { added: 'Added', repeat: 'Repeated', selfcorrect: 'First try, then fixed', noise: 'Unclear sound' }[x.kind], conf: x.conf })),
+  ].sort((p, q) => p.start - q.start);
+  if (!items.length) { $('timeline').innerHTML = ''; $('tlAxis').innerHTML = ''; return; }
+  const t0 = items[0].start, t1 = Math.max(...items.map(i => i.end)), span = Math.max(1, t1 - t0);
+  const pct = t => ((t - t0) / span) * 100;
+  $('timeline').innerHTML =
+    a.pauses.goodList.map(p => `<div class="tl-stop" style="left:${pct(p.from)}%;width:${pct(p.to) - pct(p.from)}%"></div>`).join('') +
+    [...a.pauses.hesitations, ...a.pauses.stuck].map(p => `<div class="tl-pause" style="left:${pct(p.from)}%;width:${pct(p.to) - pct(p.from)}%"><span>${p.gap.toFixed(1)} s</span></div>`).join('') +
+    items.map(i => `<button type="button" class="tl-word ${i.cls === 'ok' ? '' : i.cls}" style="left:${pct(i.start)}%;width:calc(${Math.max(0.6, pct(i.end) - pct(i.start))}% - 2px)"
+      data-tip="${esc(i.label)}|${esc(i.type)} at ${(i.start - t0).toFixed(1)} s|confidence ${Math.round((i.conf || 0) * 100)}%" aria-label="${esc(i.label)}, ${esc(i.type)}"></button>`).join('');
+  const step = span <= 12 ? 2 : span <= 30 ? 5 : 10;
+  let ticks = '';
+  for (let s = 0; s <= span + 0.01; s += step) ticks += `<span style="left:${(s / span) * 100}%">${s} s</span>`;
+  $('tlAxis').innerHTML = ticks;
+}
+
+function renderSentences(a) {
+  $('sentences').innerHTML = a.sentences.map(s => {
+    const notes = [s.skipped && `${s.skipped} skipped`, s.changed && `${s.changed} changed`].filter(Boolean).join(', ');
+    return `<li><div class="s-text">${esc(s.text)}</div>
+      <div class="s-row"><div class="s-bar" role="img" aria-label="${s.accuracy}% correct"><span style="width:${s.accuracy}%"></span></div><b>${s.accuracy}%</b></div>
+      ${notes ? `<div class="s-note">${notes}</div>` : ''}</li>`;
+  }).join('');
+}
+
+// ---------- tries on this passage ----------
+function triesKey() { let h = 0; for (const ch of passageText()) h = (h * 31 + ch.charCodeAt(0)) | 0; return 'rc-tries2-' + h; }
+const loadTries = () => store.get(triesKey(), []);
+function saveTry(c) {
+  const t = loadTries();
+  t.push({ id: c.id, at: c.at, total: marksOf(c).total, acc: c.analysis.accuracy, wcpm: c.analysis.wcpm, mode: c.mode, source: c.source, reviewed: false });
+  store.set(triesKey(), t.slice(-20));
+}
+function updateTry(c, patch) { const t = loadTries(); const x = t.find(y => y.id === c.id); if (x) { Object.assign(x, patch); store.set(triesKey(), t); } }
+function renderTries() {
+  const tries = loadTries(), shown = tries.slice(-6), firstNo = tries.length - shown.length + 1;
+  const how = { mic: 'Read aloud', sample: 'Sample', file: 'Audio file' };
+  $('tries').innerHTML = '<thead><tr><th>Try</th><th>Score</th><th>Accuracy</th><th>Pace</th><th>Mode</th><th>How</th></tr></thead><tbody>' +
+    shown.map((t, i) => `<tr class="${current && t.id === current.id ? 'latest' : ''}"><td>${firstNo + i}${current && t.id === current.id ? ' <small>this one</small>' : ''}</td>
+      <td>${t.total}/10${t.reviewed ? ' <small>teacher</small>' : ''}${t.quiz ? ` <small>· ${t.quiz}</small>` : ''}</td>
+      <td><div class="tr-acc"><div class="s-bar"><span style="width:${t.acc}%"></span></div>${t.acc}%</div></td>
+      <td>${t.wcpm} wpm</td><td>${t.mode === 'test' ? 'Test' : 'Practice'}</td><td>${how[t.source] || t.source}</td></tr>`).join('') + '</tbody>';
+}
+
+// ---------- questions after reading ----------
+function renderQuiz(c) {
+  const qs = PASSAGES.find(p => p.id === c.passageId)?.questions;
+  if (!qs || c.text !== PASSAGES.find(p => p.id === c.passageId).text || c.analysis.heardTooLittle) { $('quiz').hidden = true; return; }
+  const done = c.quiz;
+  $('quizForm').innerHTML = qs.map((q, k) => `<fieldset><legend>${k + 1}. ${esc(q.q)}</legend>` +
+    q.options.map((o, j) => {
+      const cls = done && appMode === 'practice' ? (j === q.answer ? 'right' : done.picks[k] === j ? 'wrong-pick' : '') : '';
+      return `<label class="${cls}"><input type="radio" name="q${k}" value="${j}" ${done && done.picks[k] === j ? 'checked' : ''} ${done ? 'disabled' : ''}> ${esc(o)}</label>`;
+    }).join('') + '</fieldset>').join('') +
+    (done ? `<p class="q-result">${done.right} of ${qs.length} correct.${appMode === 'test' ? ' Your answers are saved.' : ''}</p>`
+          : `<button type="submit" class="primary-btn" id="quizSubmit" disabled>Check my answers</button>`);
+  $('quiz').hidden = false;
+}
+$('quizForm').addEventListener('change', () => {
+  const qs = PASSAGES.find(p => p.id === current.passageId).questions;
+  const b = $('quizSubmit'); if (b) b.disabled = qs.some((_, k) => !$('quizForm').querySelector(`input[name="q${k}"]:checked`));
+});
+$('quizForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const qs = PASSAGES.find(p => p.id === current.passageId).questions;
+  const picks = qs.map((_, k) => +($('quizForm').querySelector(`input[name="q${k}"]:checked`) || {}).value);
+  current.quiz = { picks, right: picks.filter((p, k) => p === qs[k].answer).length };
+  updateTry(current, { quiz: `${current.quiz.right}/${qs.length} questions` });
+  renderQuiz(current); renderTries();
+});
+
+// ---------- teacher review ----------
+const RV_WORD = { ok: 'Correct', tip: 'Correct (sound tip)', selfc: 'Fixed it themselves', skip: 'Skipped', change: 'Changed', unclear: 'Unclear' };
+const RV_EXTRA = { added: 'Added (a mistake)', repeat: 'Repeated (not a mistake)', noise: 'Not a word (ignore)' };
+let rvAccTouched = false, rvDraft = null;
+const machineExtra = x => (x.kind === 'selfcorrect' ? 'repeat' : x.kind);
+function openReview() {
+  const c = current; if (!c) return;
+  const a = c.analysis, m = marksOf(c), prev = c.review;
+  const opts = (max, v) => Array.from({ length: max }, (_, k) => k + 1).map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n}</option>`).join('');
+  $('rvAcc').innerHTML = opts(4, m.accuracy); $('rvPace').innerHTML = opts(3, m.pace); $('rvPhr').innerHTML = opts(3, m.phrasing);
+  rvAccTouched = !!prev;
+  rvDraft = {
+    words: Object.fromEntries(a.words.map(w => [w.i, prev?.words?.[w.i] ?? machineWordStatus(w)])),
+    extras: Object.fromEntries(a.extras.map((x, k) => [k, prev?.extras?.[k] ?? machineExtra(x)])),
+  };
+  $('rvAudio').src = c.playUrl || '';
+  $('rvNote').value = prev ? prev.note : '';
+  $('rvSaved').textContent = prev ? 'Saved earlier. Saving again replaces it.' : '';
+  $('rvAll').checked = false;
+  renderReviewWords();
+  updateReviewTotal();
+  $('review').showModal();
+}
+function machineWordStatus(w) { return w.status === 'ok' && w.selfCorrected ? 'selfc' : w.status; }
+function renderReviewWords() {
+  const a = current.analysis, all = $('rvAll').checked;
+  const rows = [];
+  for (const w of a.words) {
+    const mach = machineWordStatus(w), teach = rvDraft.words[w.i];
+    if (!all && mach === 'ok' && teach === 'ok') continue;
+    rows.push(`<tr data-w="${w.i}" class="${teach !== mach ? 'changed' : ''}"><td>${esc(RS.clean(w.raw))}</td><td>${RV_WORD[mach]}${w.status === 'change' ? ` (“${esc(w.heard)}”)` : ''}</td>
+      <td><select aria-label="Teacher mark for ${esc(RS.clean(w.raw))}">${Object.entries(RV_WORD).map(([k, v]) => `<option value="${k}" ${k === teach ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td>${w.start !== null ? `<button type="button" class="rv-play" data-s="${w.start}" data-e="${w.end}" aria-label="Play">▶</button>` : ''}</td></tr>`);
+  }
+  a.extras.forEach((x, k) => {
+    const teach = rvDraft.extras[k];
+    rows.push(`<tr data-x="${k}" class="${teach !== machineExtra(x) ? 'changed' : ''}"><td>+ ${esc(x.word === '[unk]' ? 'a sound' : x.word)}</td><td>${{ added: 'Added', repeat: 'Repeated', selfcorrect: 'First try, then fixed', noise: 'Unclear sound' }[x.kind]}</td>
+      <td><select aria-label="Teacher mark for extra word">${Object.entries(RV_EXTRA).map(([kk, v]) => `<option value="${kk}" ${kk === teach ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
+      <td><button type="button" class="rv-play" data-s="${x.start}" data-e="${x.end}" aria-label="Play">▶</button></td></tr>`);
+  });
+  $('rvWords').innerHTML = '<thead><tr><th>Word</th><th>Tool said</th><th>Teacher says</th><th></th></tr></thead><tbody>' +
+    (rows.join('') || '<tr><td colspan="4">The tool marked every word correct. Tick “Show every word” to change any of them.</td></tr>') + '</tbody>';
+}
+const teacherWords = () => rvDraft;
+function updateReviewTotal() {
+  const t = RS.totalOf({ accuracy: +$('rvAcc').value, pace: +$('rvPace').value, phrasing: +$('rvPhr').value });
+  $('rvTotal').textContent = `Total: ${t} out of 10` + (current.analysis.rubric.total !== t ? ` (the tool gave ${current.analysis.rubric.total})` : '');
+}
+// when the teacher changes words, suggest the accuracy mark from the rubric (unless they set it themselves)
+function suggestAccuracy() {
+  if (rvAccTouched) return;
+  const { words, extras } = teacherWords();
+  const vals = Object.values(words), checked = vals.filter(v => v !== 'unclear').length;
+  const errors = vals.filter(v => v === 'skip' || v === 'change').length + Object.values(extras).filter(v => v === 'added').length;
+  const pct = checked ? Math.round(100 * (checked - errors) / checked) : 0;
+  $('rvAcc').value = RS.CONFIG.rubric.accuracy.find(([min]) => pct >= min)[1];
+}
+$('rvWords').addEventListener('change', e => {
+  const tr = e.target.closest('tr'); if (!tr) return;
+  const c = current.analysis;
+  let mach;
+  if (tr.dataset.w !== undefined) { mach = machineWordStatus(c.words[+tr.dataset.w]); rvDraft.words[+tr.dataset.w] = e.target.value; }
+  else { mach = machineExtra(c.extras[+tr.dataset.x]); rvDraft.extras[+tr.dataset.x] = e.target.value; }
+  tr.classList.toggle('changed', e.target.value !== mach);
+  suggestAccuracy(); updateReviewTotal();
+});
+$('rvWords').addEventListener('click', e => {
+  const b = e.target.closest('.rv-play'); if (!b) return;
+  const a = $('rvAudio'); a.currentTime = Math.max(0, +b.dataset.s - 0.2); rvStopAt = +b.dataset.e + 0.2; a.play();
+});
+let rvStopAt = null;
+$('rvAudio').addEventListener('timeupdate', () => { if (rvStopAt !== null && $('rvAudio').currentTime >= rvStopAt) { $('rvAudio').pause(); rvStopAt = null; } });
+$('rvAll').onchange = renderReviewWords;
+$('rvAcc').onchange = () => { rvAccTouched = true; updateReviewTotal(); };
+$('rvPace').onchange = $('rvPhr').onchange = updateReviewTotal;
+$('rvClose').onclick = () => { $('rvAudio').pause(); $('review').close(); };
+$('review').addEventListener('close', () => $('rvAudio').pause());
+$('reviewBtn').onclick = openReview;
+$('rvSave').onclick = () => {
+  const c = current, a = c.analysis, words = { ...rvDraft.words }, extras = { ...rvDraft.extras };
+  const marks = { accuracy: +$('rvAcc').value, pace: +$('rvPace').value, phrasing: +$('rvPhr').value };
+  c.review = { saved: true, at: new Date().toISOString(), marks, words, extras, note: $('rvNote').value.trim() };
+  const machineWords = Object.fromEntries(a.words.map(w => [w.i, machineWordStatus(w)]));
+  const changedWords = Object.keys(words).filter(i => words[i] !== machineWords[i]).length;
+  const reviews = store.get('rc-reviews', []).filter(r => r.id !== c.id);
+  reviews.push({
+    id: c.id, at: c.review.at, readingAt: c.at, passageId: c.passageId, title: c.title, text: c.text, mode: c.mode, source: c.source,
+    machine: { marks: { accuracy: a.rubric.accuracy.marks, pace: a.rubric.pace.marks, phrasing: a.rubric.phrasing.marks }, total: a.rubric.total,
+               accuracyPct: a.accuracy, wcpm: a.wcpm, clarity: a.clarity,
+               words: a.words.map(w => ({ i: w.i, word: w.raw, status: machineWordStatus(w), heard: w.heard, openHeard: w.openHeard ?? null, conf: w.conf, start: w.start, end: w.end })),
+               extras: a.extras.map(x => ({ word: x.word, kind: x.kind, start: x.start, end: x.end, conf: x.conf })),
+               pauses: { hesitations: a.pauses.hesitations, stuck: a.pauses.stuck, rushed: a.pauses.rushed } },
+    teacher: { marks, total: RS.totalOf(marks), words, extras, note: c.review.note },
+    differences: { words: changedWords, extras: Object.keys(extras).filter(k => extras[k] !== machineExtra(a.extras[k])).length,
+                   total: RS.totalOf(marks) - a.rubric.total },
+  });
+  store.set('rc-reviews', reviews);
+  updateTry(c, { reviewed: true, total: RS.totalOf(marks) });
+  $('rvSaved').textContent = `Saved. ${changedWords} word${changedWords === 1 ? '' : 's'} changed.`;
+  updateReviewCount();
+  showCurrent();
+};
+function updateReviewCount() {
+  const n = store.get('rc-reviews', []).length;
+  $('reviewCount').textContent = n ? `${n} review${n === 1 ? '' : 's'} saved on this device.` : 'No reviews saved yet.';
+  $('downloadReviews').disabled = !n;
+}
+$('downloadReviews').onclick = () => {
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), config: RS.CONFIG, reviews: store.get('rc-reviews', []) }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = 'reading-check-reviews.json'; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+// ---------- timeline tooltip (hover with a mouse, tap or focus on a tablet) ----------
+function showTip(el) {
+  const [a, b, c] = el.dataset.tip.split('|'), tip = $('tlTip');
+  tip.innerHTML = `<b>${a}</b><span>${b}</span><span>${c}</span>`; tip.hidden = false;
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)) + 'px';
+  tip.style.top = (r.top - tip.offsetHeight - 10) + 'px';
+}
+$('timeline').addEventListener('pointerover', e => { const el = e.target.closest('.tl-word'); if (el) showTip(el); });
+$('timeline').addEventListener('focusin', e => { const el = e.target.closest('.tl-word'); if (el) showTip(el); });
+$('timeline').addEventListener('click', e => { const el = e.target.closest('.tl-word'); if (el) showTip(el); });
+$('timeline').addEventListener('pointerleave', () => { $('tlTip').hidden = true; });
+$('timeline').addEventListener('focusout', () => { $('tlTip').hidden = true; });
 
 // Notes above marked words are centred on the word. Near the page edges on narrow screens they would
 // stick out past the paper (and make the page scroll sideways), so shift them back inside. CSS reads --nudge.
@@ -603,13 +1202,12 @@ function fitNotes() {
 let fitRaf = 0;
 addEventListener('resize', () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitNotes); });
 
-// Tap a marked word to hear that moment of the learner's own reading.
-function setTiming(span, h) { if (span && h) { span.dataset.start = h.start; span.dataset.end = h.end; if (span.matches('.wrong, .unsure')) span.classList.add('tap'); } }
+// ---------- playback ----------
 let stopAt = null;
-$('passage').addEventListener('click', e => {
-  const s = e.target.closest('.w.tap'); if (!s || !$('playback').src) return;
-  const a = $('playback'); a.currentTime = Math.max(0, +s.dataset.start - 0.15); stopAt = +s.dataset.end + 0.15; a.play();
-});
+function playRange(s, e) {
+  const a = $('playback'); if (!a.src || isNaN(s)) return;
+  a.currentTime = Math.max(0, s - 0.15); stopAt = e + 0.15; a.play();
+}
 $('playback').addEventListener('timeupdate', () => { if (stopAt !== null && $('playback').currentTime >= stopAt) { $('playback').pause(); stopAt = null; } });
 $('playAll').onclick = () => {
   const a = $('playback'); stopAt = null;
@@ -620,17 +1218,21 @@ $('playback').addEventListener('pause', () => { $('playAll').textContent = 'Hear
 
 // ---------- wiring ----------
 PASSAGES.forEach((p, i) => $('passageSelect').add(new Option(p.title, i)));
-$('passageSelect').onchange = () => { $('passageText').value = PASSAGES[$('passageSelect').value].text; renderPassage(); };
-$('passageText').oninput = renderPassage;
+$('passageSelect').onchange = () => { $('passageText').value = passage().text; current = null; renderPassage(); };
+$('passageText').oninput = () => { current = null; renderPassage(); };
 $('passageSelect').onchange();
 
 $('mic').onclick = () => (rec ? stopMic() : startMic());
+$('modePractice').onclick = () => setAppMode('practice');
+$('modeTest').onclick = () => setAppMode('test');
+setAppMode(appMode === 'test' ? 'test' : 'practice');
+updateReviewCount();
 
 const tools = $('tools');
 $('toolsBtn').onclick = () => tools.showModal();
 $('toolsClose').onclick = () => tools.close();
 tools.addEventListener('click', e => { if (e.target === tools) tools.close(); });
-$('mode').onchange = renderPassage;
+$('mode').onchange = () => { current = null; renderPassage(); };
 
 SAMPLES.forEach(s => {
   const b = document.createElement('button'); b.type = 'button';
