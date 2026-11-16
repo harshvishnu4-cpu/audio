@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Reading Check</title>
 <!--
   THROWAWAY SPIKE. Purpose: find out whether on-device speech recognition (Vosk, Indian English
@@ -11,38 +11,72 @@
 -->
 <style>
   :root {
-    --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0;
+    --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0; --edge: #c3cad6;
     --ink: #1e3a8a; --text: #1f2937; --muted: #5b6475; --pen: #c8312b; --pen-soft: #fbe9e7;
-    --lh: 56px; --pad-left: 76px;
+
+    /* Size scale, mobile first. These base values are for the narrowest phones (under 360px);
+       the media queries below step them up. Type and ruling are in rem so the page grows with the
+       reader's own text-size setting. Every line of text sits on the ruling (--lh), so change
+       sizes here, per screen size, rather than on single elements. */
+    --max: 960px; --gutter: 10px; --bar-top: 12px; --page-bottom: 32px;
+    --lh: 2.625rem; --pad-left: 2.25rem; --pad-right: 14px;
+    --fs-passage: 1.25rem; --fs-title: 1.0625rem; --fs-note: 0.875rem; --fs-pick: 1.0625rem; --fs-verdict: 1.25rem;
+    --grade-w: 4.25rem; --grade-h: 3.25rem; --grade-fs: 1.375rem; --grade-top: 6px; --grade-right: 6px;
+    --mic: 80px; --controls-gap: 20px;
   }
+  @media (min-width: 22.5em) { /* phones, 360px and up */
+    :root { --gutter: 12px; --lh: 2.875rem; --pad-left: 2.75rem; --pad-right: 18px;
+            --fs-passage: 1.375rem; --fs-title: 1.125rem; --fs-note: 1rem; --fs-pick: 1.1875rem; --fs-verdict: 1.375rem;
+            --grade-w: 5rem; --grade-h: 3.75rem; --grade-fs: 1.625rem; --grade-top: 8px; --grade-right: 8px; --mic: 88px; }
+  }
+  @media (min-width: 37.5em) { /* small tablets and large phones, 600px and up */
+    :root { --gutter: 20px; --bar-top: 18px; --page-bottom: 40px; --lh: 3.25rem; --pad-left: 4rem; --pad-right: 32px;
+            --fs-passage: 1.625rem; --fs-title: 1.25rem; --fs-pick: 1.3125rem; --fs-verdict: 1.5rem;
+            --grade-w: 6rem; --grade-h: 4.5rem; --grade-fs: 1.9375rem; --grade-top: 14px; --grade-right: 16px;
+            --mic: 96px; --controls-gap: 28px; }
+  }
+  @media (min-width: 56.25em) { /* tablets, laptops and desktops, 900px and up */
+    :root { --lh: 3.5rem; --pad-left: 4.75rem; --pad-right: 40px; --fs-passage: 1.75rem; --fs-title: 1.375rem; --fs-pick: 1.375rem;
+            --grade-w: 6.5rem; --grade-h: 4.875rem; --grade-fs: 2.125rem; --grade-top: 18px; --grade-right: 22px; }
+  }
+  @media (min-width: 90em) and (min-height: 56.25em) { /* large monitors */
+    :root { --max: 1040px; --lh: 3.75rem; --pad-left: 5rem; --fs-passage: 1.875rem; --fs-title: 1.5rem; }
+  }
+
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; min-height: 100vh; background: var(--desk); color: var(--text);
-         font: 17px/1.5 Roboto, system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; background: var(--desk); color: var(--text);
+         font: 1.0625rem/1.5 Roboto, system-ui, -apple-system, "Segoe UI", "Noto Sans", sans-serif; }
   button, select, textarea, input { font: inherit; color: inherit; }
+  button, select, label { touch-action: manipulation; }
   :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
   /* top bar */
-  .bar { max-width: 960px; margin: 0 auto; padding: 18px 20px 6px; display: flex; gap: 12px; align-items: center; }
-  .picker { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-  .picker select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font-size: 22px; font-weight: 700;
+  .bar { max-width: var(--max); margin: 0 auto; padding: var(--bar-top) var(--gutter) 4px; display: flex; gap: 10px; align-items: center; }
+  .picker { display: flex; align-items: center; flex: 1; min-width: 0; }
+  .picker select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font-size: var(--fs-pick); font-weight: 700;
                    color: var(--ink); padding: 6px 30px 6px 4px; border-radius: 8px; cursor: pointer; max-width: 100%;
+                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
                    background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%);
                    background-position: calc(100% - 14px) 55%, calc(100% - 8px) 55%; background-size: 6px 6px; background-repeat: no-repeat; }
-  .tools-btn { border: 1px solid #c3cad6; background: var(--paper); border-radius: 99px; padding: 8px 16px; font-size: 15px; cursor: pointer; color: var(--muted); }
+  .tools-btn { flex: none; white-space: nowrap; border: 1px solid var(--edge); background: var(--paper); border-radius: 99px; padding: 8px 16px;
+               font-size: 0.9375rem; cursor: pointer; color: var(--muted); }
 
   /* notebook page */
-  main { max-width: 960px; margin: 0 auto; padding: 8px 20px 40px; }
-  .page { position: relative; background-color: var(--paper); border-radius: 4px 4px 4px 4px;
+  main { max-width: var(--max); margin: 0 auto; padding: 6px var(--gutter) var(--page-bottom); }
+  .page { position: relative; background-color: var(--paper); border-radius: 4px;
           box-shadow: 0 1px 0 #d5dbe5, 0 12px 30px -18px rgba(30, 58, 138, .35);
-          padding: calc(var(--lh) * 1) 40px calc(var(--lh) * 1) var(--pad-left);
+          padding: var(--lh) var(--pad-right) var(--lh) var(--pad-left);
           background-image:
             linear-gradient(to right, transparent calc(var(--pad-left) - 18px), var(--margin) calc(var(--pad-left) - 18px), var(--margin) calc(var(--pad-left) - 16px), transparent calc(var(--pad-left) - 16px)),
             repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--rule) calc(var(--lh) - 1px), var(--rule) var(--lh));
           background-position: 0 0, 0 calc(var(--lh) * -0.25); }
-  .page h2 { margin: 0; font-size: 22px; line-height: var(--lh); color: var(--muted); font-weight: 600; }
-  .passage { margin: 0; font-size: 28px; line-height: var(--lh); color: var(--text); word-spacing: 2px; }
-  .passage .w { position: relative; white-space: nowrap; }
+  /* the right padding keeps the title clear of the circled score */
+  .page h2 { margin: 0; padding-right: calc(var(--grade-w) + var(--grade-right) - var(--pad-right));
+             font-size: var(--fs-title); line-height: var(--lh); color: var(--muted); font-weight: 600; }
+  .passage { margin: 0; font-size: var(--fs-passage); line-height: var(--lh); color: var(--text); word-spacing: 2px; overflow-wrap: break-word; }
+  .passage .w { position: relative; }
   .passage .w.tap { cursor: pointer; }
   /* live follow-along while reading */
   .passage .w.done { color: var(--ink); }
@@ -51,79 +85,111 @@
   .passage .w.miss { color: #9aa3b2; text-decoration: line-through; text-decoration-color: var(--pen); text-decoration-thickness: 3px; }
   .passage .w.wrong { text-decoration: underline wavy var(--pen); text-decoration-thickness: 2px; text-underline-offset: 7px; }
   .passage .w.unsure { text-decoration: underline dotted #8a94a6; text-decoration-thickness: 2px; text-underline-offset: 7px; }
-  .passage .w[data-note]::before { content: attr(data-note); position: absolute; left: 50%; bottom: calc(100% - 10px); transform: translateX(-50%);
-                                   font: italic 600 16px/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; pointer-events: none; }
+  /* notes over marked words; --nudge is set by fitNotes() to keep a note on the page near its edges */
+  .passage .w[data-note]::before { content: attr(data-note); position: absolute; left: 50%; bottom: calc(100% - 10px); transform: translateX(calc(-50% + var(--nudge, 0px)));
+                                   font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; pointer-events: none; }
   .passage .w.unsure[data-note]::before { color: #8a94a6; }
   .passage .ins { position: relative; display: inline-block; width: 0; height: 0; }
   .passage .ins::after { content: "^"; position: absolute; left: -11px; top: 0; color: var(--pen); font: 800 24px/1 Roboto, system-ui, sans-serif; }
-  .passage .ins::before { content: attr(data-note); position: absolute; left: -5px; bottom: 28px; transform: translateX(-50%);
-                          font: italic 600 16px/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; }
+  .passage .ins::before { content: attr(data-note); position: absolute; left: -5px; bottom: calc(var(--lh) - 1.75rem); transform: translateX(calc(-50% + var(--nudge, 0px)));
+                          font: italic 600 var(--fs-note)/1 Roboto, system-ui, sans-serif; color: var(--pen); white-space: nowrap; }
 
   /* teacher's circled score */
-  .grade { position: absolute; top: 18px; right: 22px; width: 104px; height: 78px; display: grid; place-items: center;
-           color: var(--pen); font-size: 34px; font-weight: 800; letter-spacing: -1px; transform: rotate(-6deg); pointer-events: none; }
+  .grade { position: absolute; top: var(--grade-top); right: var(--grade-right); width: var(--grade-w); height: var(--grade-h); display: grid; place-items: center;
+           color: var(--pen); font-size: var(--grade-fs); font-weight: 800; letter-spacing: -1px; transform: rotate(-6deg); pointer-events: none; }
   .grade::before { content: ""; position: absolute; inset: 0; border: 3px solid var(--pen); border-radius: 50%;
                    border-top-color: transparent; transform: rotate(18deg); }
-  .grade[hidden] { display: none; }
   @media (prefers-reduced-motion: no-preference) {
     .grade:not([hidden]) { animation: stamp .35s ease-out; }
     @keyframes stamp { from { opacity: 0; transform: rotate(-6deg) scale(1.4); } to { opacity: 1; transform: rotate(-6deg) scale(1); } }
   }
 
   /* controls under the page */
-  .controls { display: grid; justify-items: center; gap: 10px; margin-top: 28px; text-align: center; }
-  .verdict { margin: 0; font-size: 24px; font-weight: 700; color: var(--ink); min-height: 1px; }
-  .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 22px; margin: 0; color: var(--muted); font-size: 16px; }
-  .stats b { color: var(--text); font-size: 18px; }
+  .controls { display: grid; justify-items: center; gap: 10px; margin-top: var(--controls-gap); text-align: center; }
+  .verdict { margin: 0; font-size: var(--fs-verdict); font-weight: 700; color: var(--ink); min-height: 1px; text-wrap: balance; }
+  .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 0; color: var(--muted); font-size: 0.9375rem; }
+  .stats b { color: var(--text); font-size: 1.125rem; }
   .stats .bad b { color: var(--pen); }
-  .mic { --level: 0; width: 96px; height: 96px; border-radius: 50%; border: 0; cursor: pointer; margin-top: 8px;
+  .mic { --level: 0; width: var(--mic); height: var(--mic); border-radius: 50%; border: 0; cursor: pointer; margin-top: 8px;
          background: var(--ink); color: #fff; display: grid; place-items: center;
          box-shadow: 0 0 0 calc(6px + var(--level) * 22px) rgba(30, 58, 138, .14); transition: box-shadow .08s linear, background .2s; }
-  .mic svg { width: 40px; height: 40px; }
+  .mic svg { width: 42%; height: 42%; }
   .mic.recording { background: var(--pen); box-shadow: 0 0 0 calc(6px + var(--level) * 22px) rgba(200, 49, 43, .16); }
   .mic:disabled { background: #a7b0bf; cursor: default; box-shadow: none; }
-  .mic-label { font-size: 17px; color: var(--muted); min-height: 26px; }
+  .mic-label { font-size: 1.0625rem; color: var(--muted); min-height: 26px; text-wrap: balance; }
   .mic-label.err { color: var(--pen); }
   .after { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-  .after[hidden] { display: none; }
-  .ghost { border: 1px solid #c3cad6; background: var(--paper); border-radius: 99px; padding: 10px 18px; cursor: pointer; color: var(--ink); font-weight: 600; }
-  .key { margin: 14px 0 0; font-size: 14px; color: var(--muted); }
+  .ghost { border: 1px solid var(--edge); background: var(--paper); border-radius: 99px; padding: 10px 18px; cursor: pointer; color: var(--ink); font-weight: 600; }
+  .key { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; margin: 14px 0 0; font-size: 0.875rem; color: var(--muted); }
   .key .k { color: var(--pen); font-weight: 700; }
-  .note { margin: 6px auto 0; max-width: 620px; font-size: 14px; color: var(--muted); background: #f6f8fb; border: 1px dashed #c3cad6; border-radius: 10px; padding: 8px 14px; }
-  .note[hidden] { display: none; }
+  .note { margin: 6px auto 0; max-width: 620px; font-size: 0.875rem; color: var(--muted); background: #f6f8fb; border: 1px dashed var(--edge); border-radius: 10px; padding: 8px 14px; }
+  @media (min-width: 37.5em) {
+    .bar { gap: 12px; padding-bottom: 6px; }
+    main { padding-top: 8px; }
+    .stats { gap: 6px 22px; font-size: 1rem; }
+  }
 
-  /* test tools panel */
-  dialog.tools { border: 0; padding: 0; margin: 0 0 0 auto; height: 100%; max-height: 100%; width: min(420px, 100%); background: var(--paper);
-                 box-shadow: -10px 0 40px rgba(15, 23, 42, .18); color: var(--text); }
+  /* test tools panel: full screen on phones, a side sheet from 420px wide */
+  dialog.tools { border: 0; padding: 0; margin: 0 0 0 auto; width: 100%; width: min(420px, 100%); max-width: 100%; height: 100%; max-height: 100%;
+                 overscroll-behavior: contain; background: var(--paper); box-shadow: -10px 0 40px rgba(15, 23, 42, .18); color: var(--text); }
   dialog.tools::backdrop { background: rgba(15, 23, 42, .25); }
-  .tools-inner { padding: 20px 22px 40px; display: grid; gap: 22px; }
-  .tools-head { display: flex; justify-content: space-between; align-items: center; }
-  .tools-head h2 { margin: 0; font-size: 20px; }
-  .close { border: 0; background: transparent; font-size: 28px; line-height: 1; cursor: pointer; color: var(--muted); padding: 4px 8px; }
-  .field label, .field .lbl { display: block; font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
-  .field select, .field textarea { width: 100%; border: 1px solid #c3cad6; border-radius: 10px; padding: 10px 12px; background: #fff; }
+  .tools-inner { --sheet-l: 22px; --sheet-r: 22px; --sheet-top: 12px; --sheet-bottom: 40px;
+                 padding: 0 var(--sheet-r) var(--sheet-bottom) var(--sheet-l); display: grid; gap: 22px; }
+  /* the header stays put while the panel scrolls, so Close is always in reach */
+  .tools-head { position: -webkit-sticky; position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+                margin: 0 calc(var(--sheet-r) * -1) 0 calc(var(--sheet-l) * -1); padding: var(--sheet-top) calc(var(--sheet-r) - 10px) 8px var(--sheet-l);
+                background: var(--paper); border-bottom: 1px solid #e5e8ee; }
+  .tools-head h2 { margin: 0; font-size: 1.25rem; }
+  .close { flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: transparent;
+           font-size: 1.75rem; line-height: 1; cursor: pointer; color: var(--muted); }
+  .field label, .field .lbl { display: block; font-size: 0.875rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+  .field select, .field textarea { width: 100%; border: 1px solid var(--edge); border-radius: 10px; padding: 10px 12px; background: #fff; }
   .field textarea { resize: vertical; min-height: 120px; }
-  .field p { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+  .field p { margin: 6px 0 0; font-size: 0.8125rem; color: var(--muted); }
   .samples { display: grid; gap: 8px; margin-top: 10px; }
-  .followalong { display: flex; gap: 8px; align-items: center; font-size: 15px; }
-  .followalong input { width: 18px; height: 18px; }
-  .samples button { text-align: left; border: 1px solid #c3cad6; background: #fff; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
-  .samples button small { display: block; color: var(--muted); font-size: 13px; }
-  .filebtn { display: inline-block; border: 1px solid #c3cad6; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-  .engine { font-size: 14px; color: var(--muted); }
-  .engine p { margin: 0 0 6px; }
-  .engine table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .field .followalong { display: flex; gap: 8px; align-items: center; font-size: 0.9375rem; }
+  .followalong input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--ink); }
+  .samples button { text-align: left; border: 1px solid var(--edge); background: #fff; border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .samples button small { display: block; color: var(--muted); font-size: 0.8125rem; }
+  .filebtn { display: inline-block; border: 1px solid var(--edge); border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+  .engine { font-size: 0.875rem; color: var(--muted); }
+  .engine p { margin: 0 0 6px; overflow-wrap: anywhere; }
+  .engine table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; }
   .engine td, .engine th { border-bottom: 1px solid #e5e8ee; padding: 4px 6px 4px 0; text-align: left; }
   .engine .lowc { color: var(--pen); font-weight: 700; }
 
-  @media (max-width: 640px) {
-    :root { --lh: 46px; --pad-left: 44px; }
-    .page { padding-right: 18px; }
-    .passage { font-size: 22px; }
-    .page h2 { font-size: 18px; }
-    .grade { width: 80px; height: 60px; font-size: 26px; top: 8px; right: 8px; }
-    .bar { padding: 12px 14px 4px; } main { padding: 6px 12px 32px; }
-    .picker select { font-size: 19px; }
+  /* mouse vs touch */
+  @media (hover: hover) {
+    .tools-btn:hover, .ghost:hover, .samples button:hover, .filebtn:hover, .close:hover { background: #f3f5f9; }
+  }
+  @media (pointer: coarse) {
+    .tools-btn, .ghost, .samples button { min-height: 44px; }
+    .followalong input { width: 22px; height: 22px; }
+  }
+
+  /* notches, rounded screen corners and system bars (the page opts in with viewport-fit=cover) */
+  @supports (padding: max(0px)) {
+    .bar { padding-top: max(var(--bar-top), env(safe-area-inset-top)); }
+    .bar, main { padding-left: max(var(--gutter), env(safe-area-inset-left)); padding-right: max(var(--gutter), env(safe-area-inset-right)); }
+    main { padding-bottom: max(var(--page-bottom), calc(env(safe-area-inset-bottom) + 16px)); }
+    .tools-inner { --sheet-l: max(22px, env(safe-area-inset-left)); --sheet-r: max(22px, env(safe-area-inset-right));
+                   --sheet-top: max(12px, env(safe-area-inset-top)); --sheet-bottom: max(40px, calc(env(safe-area-inset-bottom) + 24px)); }
+  }
+
+  /* Short landscape screens: phones and small tablets turned sideways, and short laptop windows.
+     The page and the controls sit side by side. The microphone goes to the top of its column and
+     stays pinned while the page scrolls, so it is always in reach.
+     Keep this query the same as SIDE_BY_SIDE in the script. */
+  @media (orientation: landscape) and (max-height: 38.75em) and (min-width: 30em) {
+    :root { --max: 1200px; --gutter: 16px; --bar-top: 8px; --lh: 3rem; --pad-left: 3rem; --pad-right: 20px;
+            --fs-passage: 1.5rem; --fs-title: 1.125rem; --fs-note: 1rem; --fs-pick: 1.1875rem; --fs-verdict: 1.25rem;
+            --grade-w: 5rem; --grade-h: 3.75rem; --grade-fs: 1.625rem; --grade-top: 8px; --grade-right: 10px; --mic: 72px; }
+    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 30%); gap: 16px; align-items: start; padding-top: 0; }
+    .controls { position: -webkit-sticky; position: sticky; top: 12px; margin-top: 0; gap: 8px; }
+    .controls .mic { order: -2; margin-top: 6px; }
+    .controls .mic-label { order: -1; font-size: 0.9375rem; }
+    .stats { gap: 2px 14px; font-size: 0.875rem; }
+    .key { margin-top: 4px; gap: 2px 14px; }
   }
 </style>
 </head>
@@ -155,7 +221,9 @@
       <button id="playAll" class="ghost" type="button">Hear my reading</button>
     </div>
     <p id="key" class="key" hidden>
-      <span class="k">—</span> missed &nbsp;&nbsp; <span class="k">〰</span> read differently (tap to hear) &nbsp;&nbsp; <span class="k">‸</span> added word
+      <span><span class="k">—</span> missed</span>
+      <span><span class="k">〰</span> read differently (tap to hear)</span>
+      <span><span class="k">‸</span> added word</span>
     </p>
     <p id="note" class="note" hidden></p>
   </section>
@@ -348,6 +416,8 @@ function livePosition(refN, heard) {
   return bestI - 1;
 }
 
+// Same query as the side-by-side layout in the CSS: there the controls sit beside the page, not below it.
+const SIDE_BY_SIDE = matchMedia('(orientation: landscape) and (max-height: 38.75em) and (min-width: 30em)');
 let liveSpans = [], liveRef = [], livePos = -1;
 function followAlong(heard) {
   const pos = livePosition(liveRef, heard.map(w => (w === '[unk]' ? w : norm(w))));
@@ -356,8 +426,10 @@ function followAlong(heard) {
   liveSpans.forEach((s, i) => { s.classList.toggle('done', i < pos); s.classList.toggle('here', i === pos); });
   const here = liveSpans[pos];
   if (here) {
+    // keep the current word in a comfortable band; the band shrinks on short screens
     const r = here.getBoundingClientRect();
-    if (r.top < 80 || r.bottom > innerHeight - 160) here.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    const topRoom = Math.min(80, innerHeight * 0.15), bottomRoom = SIDE_BY_SIDE.matches ? topRoom : Math.min(160, innerHeight * 0.3);
+    if (r.top < topRoom || r.bottom > innerHeight - bottomRoom) here.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
 }
 
@@ -505,6 +577,7 @@ function showResults(tokens, words, info, playUrl, expectText) {
   $('after').hidden = !playUrl;
   $('note').textContent = expectText || ''; $('note').hidden = !expectText;
   setMic('idle', 'Tap to read again');
+  fitNotes();
 
   $('engineInfo').innerHTML =
     `<p>Mode: ${esc($('mode').selectedOptions[0].text)}.</p><p>${esc(info.speed)} Engine loaded in ${(modelLoadMs / 1000).toFixed(1)} s.</p>` +
@@ -513,6 +586,22 @@ function showResults(tokens, words, info, playUrl, expectText) {
     hyp.map(w => `<tr><td>${esc(w.word)}</td><td class="${w.conf < UNSURE_CONF ? 'lowc' : ''}">${w.conf.toFixed(2)}</td><td>${w.start.toFixed(2)}</td></tr>`).join('') + '</table>';
   window.__lastResult = { acc, ok, miss, wrong, unsure, extra, heard: hyp.map(w => w.word).join(' ') };
 }
+
+// Notes above marked words are centred on the word. Near the page edges on narrow screens they would
+// stick out past the paper (and make the page scroll sideways), so shift them back inside. CSS reads --nudge.
+function fitNotes() {
+  const page = $('passage').closest('.page').getBoundingClientRect(), min = page.left + 6, max = page.right - 6;
+  $('passage').querySelectorAll('[data-note]').forEach(el => {
+    el.style.removeProperty('--nudge');
+    const w = parseFloat(getComputedStyle(el, '::before').width) || 0, r = el.getBoundingClientRect();
+    const mid = el.classList.contains('ins') ? r.left - 5 : r.left + r.width / 2; // matches the CSS "left" of each note
+    const left = mid - w / 2, right = mid + w / 2;
+    const nudge = left < min ? min - left : right > max ? max - right : 0;
+    if (nudge) el.style.setProperty('--nudge', nudge.toFixed(1) + 'px');
+  });
+}
+let fitRaf = 0;
+addEventListener('resize', () => { cancelAnimationFrame(fitRaf); fitRaf = requestAnimationFrame(fitNotes); });
 
 // Tap a marked word to hear that moment of the learner's own reading.
 function setTiming(span, h) { if (span && h) { span.dataset.start = h.start; span.dataset.end = h.end; if (span.matches('.wrong, .unsure')) span.classList.add('tap'); } }
