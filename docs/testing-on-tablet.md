@@ -5,12 +5,14 @@ This is a test page, not the course screen.
 
 ## What's in here
 
+Everything in `public/` is the website. Vercel serves that folder as the site root (set in `vercel.json`).
+
 | Path | What it is |
 |---|---|
-| `index.html` | The test page: pick a passage, tap the mic and read aloud, see mistakes marked in red on the page. Passage editing, listening mode, sample recordings and engine details are under **Test tools** (top right) |
-| `lib/vosk.js` | vosk-browser 0.0.8: the Vosk speech engine compiled to WebAssembly (~5.8 MB) |
-| `models/en-in.tar.gz` | Vosk small **Indian English** model 0.4, repacked from the official zip (~36 MB) |
-| `samples/*.wav` | Synthetic test readings (macOS "Aman" voice) with known, deliberate mistakes |
+| `public/index.html` | The test page: pick a passage, tap the mic and read aloud, see mistakes marked in red on the page. Passage editing, listening mode, sample recordings and engine details are under **Test tools** (top right) |
+| `public/lib/vosk.js` | vosk-browser 0.0.8: the Vosk speech engine compiled to WebAssembly (~5.8 MB) |
+| `public/models/en-in.tar.gz` | Vosk small **Indian English** model 0.4, repacked from the official zip (~36 MB) |
+| `public/samples/*.wav` | Synthetic test readings (macOS "Aman" voice) with known, deliberate mistakes |
 
 ## Results on this Mac (synthetic voice)
 
@@ -27,12 +29,17 @@ This is a test page, not the course screen.
 
 ## How to test on the tablet
 
-### Option 1: tablet Chrome, quickest
+### Option 0: the Vercel link, easiest
+
+Open the Vercel URL in Chrome on the tablet and allow the microphone. Vercel serves the page over `https`, so the mic works.
+This needs internet to *load* the page. The speech checking itself still runs on the tablet, and after the first load the model is cached on the device.
+
+### Option 1: tablet Chrome over USB, no internet needed
 
 On the Mac, from this project folder:
 
 ```bash
-python3 -m http.server 8765 --directory spike
+python3 -m http.server 8765 --directory public
 ```
 
 Connect the tablet by USB, with USB debugging on, then run:
@@ -46,7 +53,7 @@ On the tablet, open Chrome and go to `http://localhost:8765`.
 
 ### Option 2: inside your app's WebView, the real setup
 
-1. Copy the `spike` folder into the app at `app/src/main/assets/spike/`.
+1. Copy the contents of the `public` folder into the app at `app/src/main/assets/reading-check/`.
 2. Add to `AndroidManifest.xml`:
    ```xml
    <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -71,7 +78,7 @@ On the tablet, open Chrome and go to `http://localhost:8765`.
            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
        }
    }
-   webView.loadUrl("https://appassets.androidplatform.net/assets/spike/index.html")
+   webView.loadUrl("https://appassets.androidplatform.net/assets/reading-check/index.html")
    ```
    Don't load it with `file:///android_asset/...`: the model won't load and the mic is blocked there.
 

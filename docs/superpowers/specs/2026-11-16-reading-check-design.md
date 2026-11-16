@@ -1,7 +1,7 @@
 # Reading Check — design
 
 *Date: 2026-11-16 · Status: draft for approval*
-*The test page this builds on is in `spike/` (see `spike/README.md`).*
+*The test page this builds on is in `public/` (hosted on Vercel; see `docs/testing-on-tablet.md`).*
 
 Decisions are marked by who made them:
 - **[decided]**: the course owner chose this in conversation.
@@ -45,7 +45,7 @@ What success looks like:
 ## 3. Constraints
 
 - **Platform:** Android tablets, with the course HTML shown in a WebView inside the organisation's app. **[decided]**
-- **WebView requirements:** the page must be served from a secure origin, so `file://` won't work. Use `WebViewAssetLoader` (`https://appassets.androidplatform.net/...`). The app must hold `RECORD_AUDIO` and grant `RESOURCE_AUDIO_CAPTURE` in `onPermissionRequest`. Working code is in `spike/README.md`.
+- **WebView requirements:** the page must be served from a secure origin, so `file://` won't work. Use `WebViewAssetLoader` (`https://appassets.androidplatform.net/...`). The app must hold `RECORD_AUDIO` and grant `RESOURCE_AUDIO_CAPTURE` in `onPermissionRequest`. Working code is in `docs/testing-on-tablet.md`.
 - **The WebView needs** WebAssembly, Web Workers, IndexedDB and `getUserMedia`. Tablets kept offline may have an old Android System WebView that never updated. **The minimum WebView version must be checked on the target fleet** (see §12).
 - **Size:** speech engine about 5.8 MB, plus Indian English model about 36 MB.
 - **Speakers:** learners with Indian English accents, likely children, in classrooms with background noise.

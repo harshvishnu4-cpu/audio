@@ -1,0 +1,4 @@
+{
+  // Live Server ("Go Live"): serve the website folder, so http://127.0.0.1:5500 opens the page directly
+  "liveServer.settings.root": "/public"
+}
