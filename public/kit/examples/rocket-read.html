@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rocket Read</title>
+<!--
+  Example game for CommKit: read the sentence aloud and the rocket climbs with every word.
+  Uses CommKit.readAloud({ text, onProgress }) — onProgress moves the rocket live, and the result
+  (score out of 10, missed and changed words) decides the stars. Everything runs offline.
+-->
+<style>
+  :root { --text: #16181d; --muted: #6a7080; --sky: #d3eefa; --lilac: #f3d3f6; --butter: #fde8b0; --mint: #c6f1d5; --fix: #a3610c;
+    --font: "Outfit", "Urbanist", "Poppins", Roboto, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: #000; color: var(--text); font: 1rem/1.5 var(--font); min-height: 100vh; }
+  .top { color: #fff; display: flex; align-items: center; gap: 12px; padding: 14px 18px; }
+  .top a { color: #c9cbd1; text-decoration: none; font-weight: 600; } .top a:hover { color: #fff; }
+  .top b { font-size: 1.125rem; letter-spacing: -.02em; flex: 1; }
+  .levels { display: flex; gap: 6px; }
+  .levels button { width: 34px; height: 34px; border-radius: 50%; border: 0; background: #1c1e23; color: #c9cbd1; font: inherit; font-weight: 700; cursor: pointer; }
+  .levels button[aria-pressed="true"] { background: #fff; color: #000; }
+  .levels button.won { box-shadow: inset 0 0 0 2px #2fae62; }
+
+  .game { margin: 0 10px 10px; border-radius: 28px; background: #f3f4f6; padding: 16px; display: grid; gap: 16px; }
+  @media (min-width: 56.25em) { .game { grid-template-columns: minmax(280px, 1fr) minmax(0, 1.4fr); align-items: stretch; min-height: calc(100vh - 82px); } }
+
+  /* the sky with the rocket */
+  .scene { position: relative; border-radius: 22px; overflow: hidden; min-height: 360px; background: linear-gradient(#c9b8f0 0%, #d3eefa 55%, #eef7fc 100%); }
+  .star { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #fff; opacity: .8; }
+  .track { position: absolute; left: 18px; top: 24px; bottom: 70px; width: 6px; border-radius: 99px; background: rgba(255,255,255,.55); }
+  .track i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; border-radius: 99px; background: #2fae62; transition: height .3s; }
+  .pad { position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: #e7e9ee; border-top: 4px solid #cfd4dc; }
+  .rocket { position: absolute; left: 50%; bottom: 46px; width: 72px; margin-left: -36px; transition: transform .45s cubic-bezier(.2,.8,.3,1); }
+  .rocket .flame { transform-origin: 50% 0; opacity: 0; transition: opacity .2s; }
+  .rocket.on .flame { opacity: 1; animation: flick .12s infinite alternate; }
+  @keyframes flick { to { transform: scaleY(1.25); } }
+  .rocket.launch { transition: transform 1.4s cubic-bezier(.5,0,.8,.4); }
+  @media (prefers-reduced-motion: reduce) { .rocket, .rocket.launch, .track i { transition: none; } .rocket.on .flame { animation: none; } }
+
+  /* the sentence and controls */
+  .side { display: grid; gap: 14px; align-content: start; }
+  .card { background: #fff; border-radius: 24px; padding: 22px; box-shadow: 0 10px 28px -14px rgba(16,24,40,.18); display: grid; gap: 14px; }
+  .eyebrow { margin: 0; font-size: .875rem; font-weight: 600; color: var(--muted); }
+  .sentence { margin: 0; font-size: clamp(1.5rem, 1.1rem + 2vw, 2.25rem); line-height: 1.5; font-weight: 600; letter-spacing: -.01em; }
+  .w { border-radius: 6px; padding: 0 2px; transition: background-color .15s, color .15s; }
+  .w.done { color: #136c3e; } .w.here { background: #fde68a; }
+  .w.skip { color: #8a93a3; text-decoration: underline dashed var(--fix) 3px; text-underline-offset: 8px; }
+  .w.change { text-decoration: underline wavy var(--fix) 3px; text-underline-offset: 8px; }
+  .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .mic { --level: 0; width: 76px; height: 76px; border-radius: 50%; border: 0; background: #000; color: #fff; cursor: pointer; display: grid; place-items: center;
+    box-shadow: 0 0 0 calc(6px + var(--level) * 18px) rgba(0,0,0,.08); transition: box-shadow .08s linear; flex: none; }
+  .mic.on { background: #b4532a; } .mic:disabled { background: #aab3c3; cursor: default; }
+  .mic svg { width: 30px; height: 30px; }
+  .status { flex: 1; min-width: 160px; color: var(--muted); }
+  .status.err { color: var(--fix); }
+  .link { border: 0; background: none; color: #3557c5; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+  .result { background: var(--lilac); border-radius: 22px; padding: 18px 20px; display: grid; gap: 8px; }
+  .stars { font-size: 2rem; letter-spacing: 4px; }
+  .stars .off { filter: grayscale(1); opacity: .3; }
+  .result h2 { margin: 0; font-size: 1.375rem; letter-spacing: -.02em; }
+  .result p { margin: 0; color: #3d4250; }
+  .btn { border: 0; border-radius: 99px; padding: 11px 20px; font: inherit; font-weight: 700; cursor: pointer; background: #000; color: #fff; }
+  .btn.soft { background: rgba(255,255,255,.75); color: var(--text); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a href="../index.html" aria-label="Back to CommKit">←</a>
+  <b>Rocket Read</b>
+  <div class="levels" id="levels" aria-label="Levels"></div>
+</header>
+
+<div class="game">
+  <section class="scene" id="scene" aria-label="Rocket">
+    <div class="track" aria-hidden="true"><i id="fuel"></i></div>
+    <div class="pad"></div>
+    <svg class="rocket" id="rocket" viewBox="0 0 72 120" aria-hidden="true">
+      <path class="flame" d="M26 92 Q36 128 46 92 Z" fill="#f59e0b"/>
+      <path class="flame" d="M30 92 Q36 114 42 92 Z" fill="#fde68a"/>
+      <path d="M36 4 C52 18 56 40 54 74 L18 74 C16 40 20 18 36 4 Z" fill="#fff" stroke="#16181d" stroke-width="3"/>
+      <circle cx="36" cy="38" r="9" fill="#bfe6f7" stroke="#16181d" stroke-width="3"/>
+      <path d="M18 56 L6 80 L18 78 Z M54 56 L66 80 L54 78 Z" fill="#f3d3f6" stroke="#16181d" stroke-width="3" stroke-linejoin="round"/>
+      <rect x="22" y="74" width="28" height="16" rx="4" fill="#fde8b0" stroke="#16181d" stroke-width="3"/>
+    </svg>
+  </section>
+
+  <section class="side">
+    <div class="card">
+      <p class="eyebrow" id="lvlName"></p>
+      <p class="sentence" id="sentence"></p>
+      <div class="row">
+        <button class="mic" id="mic" type="button" aria-label="Start reading"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg></button>
+        <span class="status" id="status" aria-live="polite">Tap the microphone and read the sentence aloud.</span>
+      </div>
+      <p style="margin:0"><button class="link" id="sample" type="button">No microphone? Hear a sample reader</button></p>
+    </div>
+    <div class="result" id="result" hidden aria-live="polite"></div>
+  </section>
+</div>
+
+<script src="../commkit.js"></script>
+<script>
+CommKit.offline(); // keep the game, kit and speech model on the device for offline play
+const LEVELS = [
+  { text: 'I can read this sentence out loud.', sample: '../../samples/kit/rocket-1.wav' },
+  { text: 'The little rocket flies over the blue sea.', sample: '../../samples/kit/rocket-2.wav' },
+  { text: 'We speak slowly and clearly so everyone can hear us.', sample: '../../samples/kit/rocket-3.wav' },
+];
+const $ = id => document.getElementById(id);
+let level = 0, reading = null, spans = [];
+let won = []; try { won = JSON.parse(localStorage.getItem('rocket-won')) || []; } catch (e) {}
+
+// a few stars in the sky
+for (let i = 0; i < 26; i++) { const s = document.createElement('i'); s.className = 'star'; s.style.left = `${Math.random() * 100}%`; s.style.top = `${Math.random() * 55}%`; $('scene').append(s); }
+
+function climb(fraction) {
+  const room = $('scene').clientHeight - 190;
+  $('rocket').style.transform = `translateY(${-Math.max(0, Math.min(1, fraction)) * room}px)`;
+  $('fuel').style.height = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
+}
+function setLevel(i) {
+  if (reading) return;
+  level = i;
+  $('levels').innerHTML = LEVELS.map((_, k) => `<button type="button" aria-pressed="${k === level}" class="${won.includes(k) ? 'won' : ''}" aria-label="Level ${k + 1}">${k + 1}</button>`).join('');
+  $('lvlName').textContent = `Level ${level + 1} of ${LEVELS.length}`;
+  $('sentence').innerHTML = LEVELS[level].text.split(' ').map(w => `<span class="w">${w}</span>`).join(' ');
+  spans = [...$('sentence').querySelectorAll('.w')];
+  $('result').hidden = true; $('rocket').classList.remove('on', 'launch'); climb(0);
+  status('Tap the microphone and read the sentence aloud.');
+}
+$('levels').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setLevel([...$('levels').children].indexOf(b)); });
+function status(t, err) { $('status').textContent = t; $('status').classList.toggle('err', !!err); }
+function micState(on, busy) {
+  $('mic').classList.toggle('on', on); $('mic').disabled = !!busy;
+  $('mic').setAttribute('aria-label', on ? 'Stop' : 'Start reading');
+}
+
+async function go(audio) {
+  setLevel(level);
+  micState(!audio, !!audio);
+  status(CommKit.isReady ? (audio ? 'Listening to the sample…' : 'Read the sentence aloud…') : 'Getting the listener ready…');
+  $('rocket').classList.add('on');
+  reading = CommKit.readAloud({
+    text: LEVELS[level].text, audio,
+    onProgress: (i, total) => { if (!audio) status('Keep reading…'); spans.forEach((s, k) => { s.classList.toggle('done', k < i); s.classList.toggle('here', k === i); }); climb((i + 1) / total * 0.8); },
+    onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)),
+  });
+  try { show(await reading.done); }
+  catch (e) { status(e.message, true); $('rocket').classList.remove('on'); climb(0); }
+  finally { reading = null; micState(false, false); }
+}
+function show(r) {
+  spans.forEach((s, k) => { s.className = 'w ' + (r.words[k] ? (r.words[k].status === 'ok' ? 'done' : r.words[k].status) : ''); });
+  const box = $('result'); box.hidden = false;
+  if (r.tooNoisy || r.heardTooLittle) {
+    $('rocket').classList.remove('on'); climb(0);
+    box.innerHTML = `<h2>The rocket didn't hear you</h2><p>${r.tooNoisy ? 'It was too noisy. Try somewhere quieter.' : 'Hold the device a little closer and read the whole sentence.'}</p><div><button class="btn" id="again" type="button">Try again</button></div>`;
+  } else {
+    const stars = r.score >= 9 ? 3 : r.score >= 7 ? 2 : r.score >= 5 ? 1 : 0;
+    if (stars) { $('rocket').classList.add('launch'); $('rocket').style.transform = `translateY(-${$('scene').clientHeight + 160}px)`; $('fuel').style.height = '100%';
+      if (!won.includes(level)) { won.push(level); try { localStorage.setItem('rocket-won', JSON.stringify(won)); } catch (e) {} } }
+    else { $('rocket').classList.remove('on'); climb(0.2); }
+    box.innerHTML = `<div class="stars" aria-label="${stars} of 3 stars">${[1, 2, 3].map(k => `<span class="${k <= stars ? '' : 'off'}">⭐</span>`).join('')}</div>
+      <h2>${stars ? 'Lift-off! ' : ''}${r.headline}</h2><p>${r.tip}</p>
+      <div class="row"><button class="btn soft" id="again" type="button">Try again</button>${stars && level < LEVELS.length - 1 ? '<button class="btn" id="next" type="button">Next level</button>' : ''}</div>`;
+    const n = $('next'); if (n) n.onclick = () => setLevel(level + 1);
+  }
+  $('again').onclick = () => setLevel(level);
+  status(r.score >= 5 ? 'Great reading!' : 'Have another go.');
+}
+$('mic').onclick = () => (reading ? (status('Checking…'), reading.stop()) : go());
+$('sample').onclick = () => { if (!reading) go(LEVELS[level].sample); };
+setLevel(Math.min(won.length, LEVELS.length - 1));
+</script>
+</body>
+</html>

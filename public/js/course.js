@@ -90,4 +90,32 @@
   }
 
   root.Course = { PASSAGES, KINDS, ICON, keyFor, lessons, summary, mountTopbar, svg };
+
+  // keep the course on the device so it opens offline after the first visit (web only; an app's own files are already offline)
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('commkit-sw.js').then(() => navigator.serviceWorker.ready)
+      .then(reg => {
+        // the whole course, so every tab opens offline after one visit (versioned ?v= URLs fall back to these copies)
+        const msg = { type: 'cache', urls: ['plan.html', 'index.html', 'write.html', 'speak.html', 'css/base.css', 'css/course.css',
+          'js/course.js', 'js/tasks.js', 'js/scoring.js', 'js/answer-scoring.js', 'js/answer-ui.js', 'js/speech.js',
+          'lib/vosk.js', 'models/en-in.tar.gz'].map(u => new URL(u, location.href).href) };
+        reg.active.postMessage(msg);
+        navigator.serviceWorker.addEventListener('controllerchange', () => navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage(msg), { once: true });
+      })
+      .catch(() => {});
+    // the speech engine downloads the model inside a worker the offline cache can't see, so when the cache is
+    // active, fetch the model here (the cache answers it) and hand it over
+    const V = root.Vosk;
+    if (V && V.createModel && !V.createModel.viaPage) {
+      const original = V.createModel;
+      const wrapped = async (u, ...rest) => {
+        if (!navigator.serviceWorker.controller) return original(u, ...rest);
+        let src = u;
+        try { const r = await fetch(u); if (r.ok) src = URL.createObjectURL(await r.blob()); } catch (e) {}
+        try { return await original(src, ...rest); } finally { if (src !== u) URL.revokeObjectURL(src); }
+      };
+      wrapped.viaPage = true;
+      try { V.createModel = wrapped; } catch (e) {}
+    }
+  }
 })(typeof self !== 'undefined' ? self : this);

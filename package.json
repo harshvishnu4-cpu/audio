@@ -3,7 +3,8 @@
   "private": true,
   "description": "Offline reading, writing and speaking practice with optional AI feedback",
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "kit": "bash tools/build_kit.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.9.0"

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Word Pop</title>
+<!--
+  Example game for CommKit: say the word on a balloon to pop it.
+  The whole game uses one kit call: CommKit.listenFor(words, { onWord }) keeps the microphone open
+  for the round and tells the game each time one of the words is said. Everything runs offline.
+-->
+<style>
+  :root { --text: #16181d; --muted: #6a7080; --font: "Outfit", "Urbanist", "Poppins", Roboto, system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: #000; color: var(--text); font: 1rem/1.5 var(--font); display: flex; flex-direction: column; }
+  .top { color: #fff; display: flex; align-items: center; gap: 12px; padding: 14px 18px; }
+  .top a { color: #c9cbd1; text-decoration: none; font-weight: 600; } .top a:hover { color: #fff; }
+  .top b { font-size: 1.125rem; letter-spacing: -.02em; flex: 1; }
+  .hud { display: flex; align-items: center; gap: 10px; }
+  .chip { background: #1c1e23; color: #fff; border-radius: 99px; padding: 6px 14px; font-weight: 700; font-variant-numeric: tabular-nums; display: inline-flex; gap: 6px; align-items: center; }
+  .chip span { color: #a3a7b1; font-weight: 500; }
+  .level { width: 10px; height: 10px; border-radius: 50%; background: #3a3d45; transition: transform .08s, background .2s; }
+  .level.on { background: #2fae62; }
+
+  .sky { position: relative; flex: 1; margin: 0 10px 10px; border-radius: 28px; overflow: hidden; min-height: 420px;
+    background: linear-gradient(#d9f0fb, #f1f6fb 70%, #f3f4f6); }
+  .heard { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(255,255,255,.85); border-radius: 99px; padding: 8px 18px; color: var(--muted); font-size: .9375rem; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; z-index: 3; }
+  .heard b { color: var(--text); }
+
+  /* balloons */
+  .balloon { position: absolute; bottom: -170px; width: 112px; height: 160px; display: grid; justify-items: center; animation: rise var(--t, 11s) linear forwards; z-index: 1; }
+  .balloon .body { width: 104px; height: 124px; border-radius: 50% 50% 48% 48% / 55% 55% 45% 45%; background: var(--c);
+    box-shadow: inset -12px -14px 0 rgba(0,0,0,.05), inset 12px 10px 0 rgba(255,255,255,.5); display: grid; place-items: center; position: relative; }
+  .balloon .body::after { content: ""; position: absolute; bottom: -9px; left: 50%; margin-left: -8px; border: 8px solid transparent; border-bottom-color: var(--c); transform: rotate(180deg); }
+  .balloon .word { font-weight: 750; font-size: 1.1875rem; letter-spacing: -.01em; padding: 0 6px; text-align: center; }
+  .balloon .string { width: 2px; height: 30px; background: #b9bfca; margin-top: 6px; }
+  @keyframes rise { to { transform: translateY(calc(-1 * var(--h, 700px) - 200px)); } }
+  .balloon.pop { animation-play-state: paused; }
+  .balloon.pop .body { animation: pop .28s ease-out forwards; }
+  .balloon.pop .string { opacity: 0; transition: opacity .2s; }
+  @keyframes pop { 50% { transform: scale(1.18); } to { transform: scale(.2); opacity: 0; } }
+  .plus { position: absolute; font-weight: 800; font-size: 1.5rem; color: #136c3e; animation: up .8s ease-out forwards; z-index: 2; pointer-events: none; }
+  @keyframes up { to { transform: translateY(-50px); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .balloon.pop .body { animation: none; opacity: 0; } .plus { animation: none; } }
+
+  /* start and end card */
+  .overlay { position: absolute; inset: 0; display: grid; place-items: center; z-index: 5; background: rgba(243,244,246,.55); backdrop-filter: blur(2px); padding: 16px; }
+  .card { background: #fff; border-radius: 28px; padding: 26px 26px 22px; max-width: 420px; width: 100%; box-shadow: 0 24px 50px -24px rgba(16,24,40,.35); text-align: center; display: grid; gap: 12px; }
+  .card h1 { margin: 0; font-size: 2rem; letter-spacing: -.03em; line-height: 1.1; }
+  .card p { margin: 0; color: #3d4250; }
+  .card .big { font-size: 3.5rem; font-weight: 800; letter-spacing: -.04em; line-height: 1; }
+  .btn { border: 0; border-radius: 99px; padding: 13px 24px; font: inherit; font-weight: 700; cursor: pointer; background: #000; color: #fff; font-size: 1.0625rem; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .err { color: #a3610c; }
+  .small { font-size: .875rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a href="../index.html" aria-label="Back to CommKit">←</a>
+  <b>Word Pop</b>
+  <div class="hud"><span class="level" id="level" aria-hidden="true"></span>
+    <span class="chip">🎈 <b id="score">0</b></span><span class="chip">⏱ <b id="time">60</b><span>s</span></span></div>
+</header>
+
+<main class="sky" id="sky" aria-label="Balloons">
+  <p class="heard" id="heard" aria-live="polite">Say the word on a balloon</p>
+  <div class="overlay" id="overlay">
+    <div class="card" id="card">
+      <h1>Word Pop</h1>
+      <p>Balloons float up with words on them. Say a word out loud to pop its balloon. You have 60 seconds.</p>
+      <button class="btn" id="start" type="button">Start</button>
+      <p class="small" id="note">The first time, the listener takes a moment to load.</p>
+    </div>
+  </div>
+</main>
+
+<script src="../commkit.js"></script>
+<script>
+CommKit.offline(); // keep the game, kit and speech model on the device for offline play
+const WORDS = ['apple', 'banana', 'mango', 'orange', 'grapes', 'tiger', 'rabbit', 'monkey', 'parrot', 'horse',
+  'pencil', 'window', 'yellow', 'purple', 'garden', 'river', 'rocket', 'doctor', 'teacher', 'kitchen'];
+const COLOURS = ['#f3d3f6', '#fde8b0', '#c6f1d5', '#bfe6f7', '#fbd0e3'];
+const ROUND = 60, ON_SCREEN = 5;
+const $ = id => document.getElementById(id), sky = $('sky');
+let score = 0, left = ROUND, timer = 0, listener = null, playing = false, lane = 0;
+
+const visible = () => [...sky.querySelectorAll('.balloon:not(.pop)')];
+function spawn() {
+  if (!playing) return;
+  const taken = new Set(visible().map(b => b.dataset.word)), pool = WORDS.filter(w => !taken.has(w));
+  const word = pool[Math.floor(Math.random() * pool.length)];
+  const b = document.createElement('div'), lanes = Math.max(3, Math.floor(sky.clientWidth / 130));
+  lane = (lane + 1 + Math.floor(Math.random() * (lanes - 1))) % lanes;
+  b.className = 'balloon'; b.dataset.word = word;
+  b.style.left = `${(lane + 0.5) * (sky.clientWidth / lanes) - 56}px`;
+  b.style.setProperty('--c', COLOURS[Math.floor(Math.random() * COLOURS.length)]);
+  b.style.setProperty('--t', `${9 + Math.random() * 4}s`);
+  b.style.setProperty('--h', `${sky.clientHeight}px`);
+  b.innerHTML = `<div class="body"><span class="word">${word}</span></div><div class="string"></div>`;
+  b.addEventListener('animationend', e => { if (e.animationName === 'rise') { b.remove(); spawn(); } });
+  sky.append(b);
+}
+function pop(word) {
+  // the lowest balloon with that word (the one most at risk of escaping)
+  const b = visible().filter(x => x.dataset.word === word).sort((x, y) => y.getBoundingClientRect().top - x.getBoundingClientRect().top)[0];
+  if (!b) return false;
+  b.classList.add('pop'); score++; $('score').textContent = score;
+  const r = b.getBoundingClientRect(), s = sky.getBoundingClientRect(), plus = document.createElement('span');
+  plus.className = 'plus'; plus.textContent = '+1'; plus.style.left = `${r.left - s.left + 40}px`; plus.style.top = `${r.top - s.top + 30}px`;
+  sky.append(plus); setTimeout(() => plus.remove(), 900);
+  setTimeout(() => { b.remove(); spawn(); }, 300);
+  return true;
+}
+window.popWord = pop; // handy for testing from the console
+
+async function start() {
+  $('start').disabled = true; $('note').textContent = 'Getting the listener ready…'; $('note').className = 'small';
+  if (!(await CommKit.ready())) { $('note').textContent = 'The listener could not load. Open this page through a web server.'; $('note').className = 'small err'; $('start').disabled = false; return; }
+  score = 0; left = ROUND; $('score').textContent = 0; $('time').textContent = ROUND;
+  sky.querySelectorAll('.balloon').forEach(b => b.remove());
+  listener = CommKit.listenFor(WORDS, {
+    onWord: w => { if (playing) $('heard').innerHTML = pop(w) ? `Pop! <b>${w}</b>` : `I heard <b>${w}</b>, but it isn't on a balloon`; },
+    onLevel: v => { $('level').classList.toggle('on', v > 0.08); $('level').style.transform = `scale(${1 + v * 1.6})`; },
+  });
+  listener.done.catch(e => { // e.g. the microphone is blocked
+    playing = false; listener = null; clearInterval(timer); sky.querySelectorAll('.balloon').forEach(b => b.remove());
+    $('card').innerHTML = `<h1>Word Pop</h1><p class="err">${e.message}</p><button class="btn" id="start" type="button">Try again</button><p class="small" id="note"></p>`;
+    $('start').onclick = start; $('overlay').hidden = false;
+  });
+  playing = true; $('overlay').hidden = true; $('heard').textContent = 'Say the word on a balloon';
+  for (let i = 0; i < ON_SCREEN; i++) setTimeout(spawn, i * 1400);
+  timer = setInterval(() => { left--; $('time').textContent = left; if (left <= 0) end(); }, 1000);
+}
+function end() {
+  if (!playing && !listener) return;
+  playing = false; clearInterval(timer);
+  if (listener) { listener.stop(); listener = null; }
+  sky.querySelectorAll('.balloon').forEach(b => (b.style.animationPlayState = 'paused'));
+  let best = 0; try { best = +localStorage.getItem('wordpop-best') || 0; if (score > best) localStorage.setItem('wordpop-best', score); } catch (e) {}
+  $('card').innerHTML = `<p class="small">Time's up</p><div class="big">${score}</div><p>${score > best ? 'A new best score!' : `balloons popped · your best is ${Math.max(best, score)}`}</p>
+    <button class="btn" id="start" type="button">Play again</button><p class="small" id="note"></p>`;
+  $('start').onclick = start; $('start').disabled = false;
+  $('overlay').hidden = false;
+}
+$('start').onclick = start;
+</script>
+</body>
+</html>

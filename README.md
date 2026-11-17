@@ -8,6 +8,8 @@ Speaking and writing practice for an English communication course, built to run 
 | **Write** | `write.html` | Types an email, summary, opinion or reply | On the device: key points, length, common slips, structure, tone. **When online**, an AI model adds rubric marks, specific fixes and a better version |
 | **Speak** | `speak.html` | Records a self-introduction or an answer to a question | On the device: key points, speaking time, pace, pauses, clarity, common slips. **When online**, the AI marks content and grammar from the transcript (the audio never leaves the device) |
 
+**CommKit** (`public/kit/`) packs the same offline audio and text checking into one script for other games and interactive pages: paste-in tags (`<read-aloud>`, `<speak-answer>`, `<write-answer>`) and a JavaScript API (`CommKit.hear`, `readAloud`, `listenFor`, `checkText`, `compareText`, `say`, …). `npm run kit` builds a copy-ready folder in `dist/commkit/`. See `public/kit/README.md`, the demo at `/kit/`, and the example games in `/kit/examples/`.
+
 Written and spoken feedback both use the same six parts: level and score (out of 16), marks per criterion, what went well, at most two things to improve (using the learner's own words), a better version, and a next step.
 
 ## Folders
@@ -19,7 +21,9 @@ Written and spoken feedback both use the same six parts: level and score (out of
 | `public/js/` | `course.js` (the reading passages, the learning-plan order, progress and the shared top bar), `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page) |
 | `api/evaluate.js` | Vercel server function that asks the AI for feedback. Only the tasks in `tasks.js` can be marked |
 | `tests/` | Unit tests for all the scoring rules and the server function |
-| `tools/` | `make_noisy_samples.py`: builds the noisy test recordings |
+| `public/kit/` | CommKit: `commkit.js`, a demo page, its guide (`README.md`) and two example games |
+| `public/commkit-sw.js` | Offline cache for the course and CommKit pages |
+| `tools/` | `make_noisy_samples.py`: builds the noisy test recordings; `build_kit.sh`: builds `dist/commkit/` (`npm run kit`) |
 | `docs/testing-on-tablet.md` | How to test on a tablet and inside the Android app, plus test results |
 | `docs/superpowers/specs/` | The design doc |
 | `downloads/` | The original Vosk model zips (not part of the website) |

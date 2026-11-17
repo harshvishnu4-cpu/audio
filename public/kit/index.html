@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CommKit</title>
+<style>
+  :root { --bg: #f3f4f6; --text: #16181d; --muted: #6a7080; --line: #e7e9ee; --sky: #d3eefa; --butter: #fde8b0; --lilac: #f3d3f6; --mint: #c6f1d5; --gutter: 16px;
+    font-family: "Outfit", "Urbanist", "Poppins", Roboto, system-ui, sans-serif; color: var(--text); }
+  @media (min-width: 37.5em) { :root { --gutter: 28px; } }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: #000; line-height: 1.55; }
+  .top { color: #fff; padding: 22px var(--gutter) 26px; max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .top b { font-size: 1.25rem; letter-spacing: -.02em; } .top a { color: #c9cbd1; font-weight: 600; text-decoration: none; margin-left: 14px; } .top a:hover { color: #fff; }
+  .panel { background: var(--bg); border-radius: 28px 28px 0 0; min-height: 100vh; }
+  @media (min-width: 56.25em) { .panel { margin: 0 10px 10px; border-radius: 28px; } }
+  main { max-width: 1100px; margin: 0 auto; padding: 30px var(--gutter) 60px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; }
+  main > *, .demos, .demos > *, .demo > * { min-width: 0; } /* wide code blocks scroll inside their box */
+  h1 { margin: 0; font-size: clamp(2rem, 1.3rem + 3vw, 3rem); line-height: 1.05; letter-spacing: -.03em; }
+  .lead { margin: 10px 0 0; font-size: 1.125rem; color: #3d4250; max-width: 60ch; }
+  h2 { margin: 0 0 4px; font-size: clamp(1.375rem, 1.1rem + 1vw, 1.75rem); letter-spacing: -.02em; }
+  .sub { margin: 0 0 16px; color: var(--muted); max-width: 62ch; }
+  pre { margin: 0; background: #111317; color: #e6e8ee; border-radius: 18px; padding: 16px 18px; overflow-x: auto; font: .875rem/1.6 ui-monospace, "SF Mono", Menlo, monospace; }
+  pre .c { color: #8b93a3; } pre .k { color: #f3d3f6; } pre .s { color: #c6f1d5; }
+  .demo { display: grid; gap: 16px; align-items: start; }
+  @media (min-width: 56.25em) { .demo { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); } }
+  .demo > * { min-width: 0; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .fact { border-radius: 22px; padding: 16px 18px; } .fact b { display: block; font-size: 1.0625rem; } .fact span { color: #3d4250; font-size: .9375rem; }
+  .games { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .game { display: grid; gap: 6px; text-decoration: none; color: inherit; background: #fff; border-radius: 24px; padding: 20px; box-shadow: 0 10px 28px -14px rgba(16,24,40,.18); }
+  .game .em { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.5rem; }
+  .game b { font-size: 1.25rem; } .game span { color: var(--muted); } .game:hover { transform: translateY(-2px); transition: transform .2s; }
+  .card { background: #fff; border-radius: 24px; padding: 20px; box-shadow: 0 10px 28px -14px rgba(16,24,40,.18); display: grid; gap: 12px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 0; border-radius: 99px; padding: 10px 18px; font: inherit; font-weight: 700; cursor: pointer; background: #000; color: #fff; }
+  .btn.soft { background: #e9ebef; color: var(--text); }
+  input[type=text] { flex: 1; min-width: 200px; border: 2px solid var(--line); border-radius: 14px; padding: 11px 14px; font: inherit; font-size: 1.0625rem; }
+  .dw { display: inline-block; margin: 2px 3px; padding: 1px 6px; border-radius: 6px; }
+  .dw.ok { background: var(--mint); } .dw.close { background: var(--butter); } .dw.wrong, .dw.missing { background: #fdf2df; text-decoration: underline wavy #a3610c; }
+  table { width: 100%; min-width: 640px; border-collapse: collapse; background: #fff; border-radius: 18px; overflow: hidden; font-size: .9375rem; }
+  td, th { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; } th { background: #f7f8fa; }
+  td code { font-size: .875rem; white-space: nowrap; }
+  .note { color: var(--muted); font-size: .9375rem; margin: 8px 0 0; }
+  speak-answer { --ck-tone: var(--lilac); } write-answer { --ck-tone: var(--butter); }
+</style>
+</head>
+<body>
+<header class="top"><b>CommKit</b><nav><a href="examples/word-pop.html">Word Pop</a><a href="examples/rocket-read.html">Rocket Read</a><a href="../plan.html">Course</a></nav></header>
+<div class="panel"><main>
+  <section>
+    <h1>Audio and text checking for any learning page</h1>
+    <p class="lead">Add one script and your game or interactive page can listen to a learner read, hear the word they say, score a spoken or written answer and read text aloud. It all runs on the device, so it works offline.</p>
+  </section>
+
+  <section class="facts">
+    <div class="fact" style="background:var(--sky)"><b>Works offline</b><span>Speech is checked on the device. Nothing is sent anywhere.</span></div>
+    <div class="fact" style="background:var(--mint)"><b>One line to add</b><span>A script tag; the 37 MB speech model loads only when a page first listens.</span></div>
+    <div class="fact" style="background:var(--lilac)"><b>Tags or code</b><span>Paste a ready tag, or call the functions from your game.</span></div>
+    <div class="fact" style="background:var(--butter)"><b>Indian English</b><span>Tuned for learners: accents aren't marked as mistakes.</span></div>
+  </section>
+
+  <section>
+    <h2>1. Add the kit</h2>
+    <p class="sub">Copy the kit folder into your project (see the README), then add this one line to any page.</p>
+<pre><span class="k">&lt;script</span> src=<span class="s">"kit/commkit.js"</span><span class="k">&gt;&lt;/script&gt;</span>
+<span class="c">&lt;!-- optional: keep it working offline after the first visit --&gt;</span>
+<span class="k">&lt;script&gt;</span>CommKit.offline();<span class="k">&lt;/script&gt;</span></pre>
+  </section>
+
+  <section>
+    <h2>2. Paste a ready tag (no coding)</h2>
+    <p class="sub">Each tag is a complete activity. "Try a sample" plays a recording, so you can see it work without a microphone.</p>
+    <div class="demos" style="display:grid; grid-template-columns: minmax(0, 1fr); gap:26px">
+      <div class="demo">
+        <read-aloud heading="Read aloud" sample="../samples/p1-skipped.wav" text="Every morning my grandmother and I go for a walk in the park. We look at the birds, the trees and the flowers. On the way home, we buy fresh fruit from the market."></read-aloud>
+<pre><span class="k">&lt;read-aloud</span>
+  heading=<span class="s">"Read aloud"</span>
+  text=<span class="s">"Every morning my grandmother…"</span><span class="k">&gt;</span>
+<span class="k">&lt;/read-aloud&gt;</span>
+
+<span class="c">// the result, when the learner finishes</span>
+el.addEventListener(<span class="s">'result'</span>, e =&gt; {
+  e.detail.score   <span class="c">// 0–10</span>
+  e.detail.missed  <span class="c">// ['my', 'the', …]</span>
+});</pre>
+      </div>
+      <div class="demo">
+        <speak-answer sample="../samples/s-weekend.wav" prompt="What did you do last weekend? Say where you went, who you were with and how you felt." min-sec="45" max-sec="60"
+          points="when: saturday, sunday, weekend; what you did: went, visited, played, watched, met, cooked; who you were with: with, family, friend, cousin; how you felt: enjoyed, happy, fun, tired, liked"></speak-answer>
+<pre><span class="k">&lt;speak-answer</span>
+  prompt=<span class="s">"What did you do last weekend?"</span>
+  min-sec=<span class="s">"45"</span> max-sec=<span class="s">"60"</span>
+  points=<span class="s">"when: saturday, sunday;
+          what you did: went, visited, played;
+          who you were with: with, family, friend;
+          how you felt: enjoyed, happy, tired"</span><span class="k">&gt;</span>
+<span class="k">&lt;/speak-answer&gt;</span>
+<span class="c">// points: "label: words that show it; next label: …"</span></pre>
+      </div>
+      <div class="demo">
+        <write-answer format="reply" min-words="40" max-words="90" prompt="A customer writes: “My order arrived late and the box was damaged.” Write a polite reply."
+          points="says sorry: sorry, apologise, regret; mentions the problem: late, delay, damaged; offers a fix: replace, refund, send; polite close: thank, regards, sincerely"></write-answer>
+<pre><span class="k">&lt;write-answer</span>
+  format=<span class="s">"reply"</span>  <span class="c">&lt;!-- email | reply | summary | opinion --&gt;</span>
+  min-words=<span class="s">"40"</span> max-words=<span class="s">"90"</span>
+  prompt=<span class="s">"Write a polite reply."</span>
+  points=<span class="s">"says sorry: sorry, apologise;
+          offers a fix: replace, refund"</span><span class="k">&gt;</span>
+<span class="k">&lt;/write-answer&gt;</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. Use it in a game</h2>
+    <p class="sub">Two small games built with the kit. Open them and read the code: each is one HTML file.</p>
+    <div class="games">
+      <a class="game" href="examples/word-pop.html"><span class="em" style="background:var(--lilac)">🎈</span><b>Word Pop</b><span>Say the word on a balloon to pop it. Uses <code>CommKit.hear()</code>.</span></a>
+      <a class="game" href="examples/rocket-read.html"><span class="em" style="background:var(--sky)">🚀</span><b>Rocket Read</b><span>The rocket climbs with every word you read. Uses <code>CommKit.readAloud()</code>.</span></a>
+    </div>
+<pre style="margin-top:16px"><span class="c">// hear one of a few words (fast: it only listens for these)</span>
+<span class="k">const</span> said = <span class="k">await</span> CommKit.hear([<span class="s">'apple'</span>, <span class="s">'banana'</span>, <span class="s">'mango'</span>], { timeout: <span class="s">6000</span> });
+<span class="k">if</span> (said.word === <span class="s">'banana'</span>) score++;      <span class="c">// said.word is null if none was heard</span>
+
+<span class="c">// follow a reading live, then get the marks</span>
+<span class="k">const</span> reading = CommKit.readAloud({ text, onProgress: (i, total) =&gt; moveRocket(i / total) });
+<span class="k">const</span> r = <span class="k">await</span> reading.done;                <span class="c">// stops by itself after the last word</span>
+showStars(r.score);                             <span class="c">// 0–10, plus r.missed, r.changed, r.wcpm …</span></pre>
+  </section>
+
+  <section>
+    <h2>4. Text: listen and type</h2>
+    <p class="sub"><code>CommKit.say()</code> reads text aloud with the device's own voice, and <code>CommKit.compareText()</code> checks what was typed, word by word.</p>
+    <div class="card">
+      <div class="row"><button class="btn" id="dPlay" type="button">▶ Listen</button><span class="note" style="margin:0">Then type what you heard.</span></div>
+      <div class="row"><input type="text" id="dIn" placeholder="Type the sentence here" autocomplete="off"><button class="btn soft" id="dCheck" type="button">Check</button></div>
+      <p id="dOut" aria-live="polite" style="margin:0"></p>
+    </div>
+  </section>
+
+  <section>
+    <h2>All functions</h2>
+    <div style="overflow-x:auto; border-radius:18px"><table>
+      <tr><th>Function</th><th>What it does</th><th>Gives back</th></tr>
+      <tr><td><code>CommKit.readAloud({ text, onProgress })</code></td><td>Listens to the learner read the text; follows along live; stops after the last word</td><td><code>.done</code> → score /10, missed, changed, added, words a minute</td></tr>
+      <tr><td><code>CommKit.hear(words, { timeout })</code></td><td>Waits for one of a few words or phrases</td><td>{ word, heard, confidence, timedOut }</td></tr>
+      <tr><td><code>CommKit.listen({ onPartial })</code></td><td>Writes down whatever is said</td><td><code>.done</code> → { text, words, pauses }</td></tr>
+      <tr><td><code>CommKit.speakAnswer({ task })</code></td><td>Scores a spoken answer: key points, time, pace, pauses, fillers</td><td><code>.done</code> → score /16, level, what to improve</td></tr>
+      <tr><td><code>CommKit.checkText(text, task)</code></td><td>Scores a written answer: key points, length, common slips, structure</td><td>score /16, level, fixes, a better version</td></tr>
+      <tr><td><code>CommKit.compareText(expected, typed)</code></td><td>Checks typing or dictation word by word</td><td>{ score 0–1, words: ok / close / wrong / missing }</td></tr>
+      <tr><td><code>CommKit.say(text)</code></td><td>Reads text aloud with the device's voice</td><td>resolves when finished</td></tr>
+      <tr><td><code>CommKit.offline()</code></td><td>Keeps the kit and model on the device for offline use</td><td>true when set up</td></tr>
+    </table></div>
+    <p class="note">Every listening function also takes <code>audio: 'recording.wav'</code> to check a recording instead of the microphone, which is handy for testing. Full guide: <code>kit/README.md</code>.</p>
+  </section>
+</main></div>
+
+<script src="commkit.js"></script>
+<script>
+  CommKit.offline();
+  // listen and type
+  const SENTENCES = ['The early bird catches the worm.', 'Please speak a little more slowly.', 'We will meet at the library on Monday.'];
+  let n = 0;
+  document.getElementById('dPlay').onclick = async () => {
+    const ok = await CommKit.say(SENTENCES[n % SENTENCES.length]);
+    if (!ok) document.getElementById('dOut').textContent = 'This device has no voice for reading aloud. The sentence was: ' + SENTENCES[n % SENTENCES.length];
+  };
+  document.getElementById('dCheck').onclick = async () => {
+    const r = await CommKit.compareText(SENTENCES[n % SENTENCES.length], document.getElementById('dIn').value);
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    document.getElementById('dOut').innerHTML = `<b>${Math.round(r.score * 100)}%</b> · ` + r.words.map(w =>
+      `<span class="dw ${w.status}" title="${w.status === 'ok' ? 'Correct' : w.typed ? 'You typed “' + esc(w.typed) + '”' : 'Missing'}">${esc(w.text)}</span>`).join('') +
+      (r.score === 1 ? ' <button class="btn soft" id="dNext" type="button">Next sentence</button>' : '');
+    const next = document.getElementById('dNext');
+    if (next) next.onclick = () => { n++; document.getElementById('dIn').value = ''; document.getElementById('dOut').textContent = ''; };
+  };
+</script>
+</body>
+</html>

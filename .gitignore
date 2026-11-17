@@ -4,3 +4,4 @@ public/models/candidates/
 downloads/vosk-model-small-en-us-0.15.zip
 downloads/vosk-model-en-us-0.22-lgraph.zip
 node_modules/
+dist/
