@@ -613,9 +613,9 @@
 </dialog>
 
 <script src="lib/vosk.js"></script>
-<script src="js/scoring.js?v=4"></script>
+<script src="js/scoring.js?v=5"></script>
 <script src="js/tasks.js?v=1"></script>
-<script src="js/course.js?v=2"></script>
+<script src="js/course.js?v=3"></script>
 <script>
 const RS = window.ReadingScore;
 // Offline speech models. Candidates live in models/candidates/ (kept out of git: too big for GitHub);
@@ -805,7 +805,9 @@ function renderLessons() {
       <span class="nm">${esc(p.title)}</span>
       <span class="sub">${words} ${p.id === 'own' ? '' : b !== null ? `<span class="pill done">Done \u00b7 best ${b}/10</span>` : '<span class="pill new">New</span>'}</span>
     </button>`;
-  }).join('');
+  }).join('') + `<a class="lesson anim" href="unseen.html" style="text-decoration:none">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+      <span class="nm">Unseen passage</span><span class="sub">A new passage, read once <span class="pill new">Test</span></span></a>`;
   const preset = PASSAGES.filter(p => p.id !== 'own'), done = preset.filter(p => bestFor(p) !== null).length;
   $('progFill').style.width = `${(done / preset.length) * 100}%`;
   $('progText').textContent = `${done} of ${preset.length} done`;

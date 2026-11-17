@@ -190,7 +190,7 @@
     return out;
   }
   // Words that mean the same: swapping one for the other is a minor error.
-  const SAME_MEANING = [['kids', 'children'], ['kid', 'child'], ['big', 'large'], ['small', 'little'], ['happy', 'glad'], ['start', 'begin'], ['started', 'began'],
+  const SAME_MEANING = [['kids', 'children'], ['kid', 'child'], ['big', 'large', 'huge'], ['small', 'little', 'tiny'], ['happy', 'glad'], ['start', 'begin'], ['started', 'began'],
     ['end', 'finish'], ['shop', 'store'], ['mother', 'mom', 'mum', 'mummy'], ['father', 'dad', 'daddy', 'papa'], ['grandmother', 'grandma', 'granny', 'nani', 'dadi'],
     ['grandfather', 'grandpa', 'nana', 'dada'], ['fast', 'quick'], ['quickly', 'fast'], ['close', 'shut'], ['look', 'see'], ['looks', 'sees'], ['said', 'told'],
     ['buy', 'get'], ['road', 'street'], ['home', 'house'], ['talk', 'speak'], ['nice', 'good'], ['fine', 'okay', 'ok'], ['near', 'close'], ['ill', 'sick'],

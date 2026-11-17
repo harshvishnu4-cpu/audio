@@ -30,9 +30,12 @@
     model: (tag && tag.dataset.model) || 'models/en-in.tar.gz',
   };
   const url = p => new URL(p, ROOT).href;
+  // scripts carry the kit version, so a browser never keeps an old scorer after an update (bump VERSION when they change)
+  const VERSION = '1.1.0';
+  const scriptUrl = p => url(p) + (p.includes('?') ? '&' : '?') + 'v=' + VERSION;
   const scripts = {};
   const loadScript = (p, global) => window[global] ? Promise.resolve() : (scripts[p] = scripts[p] || new Promise((res, rej) => {
-    const s = document.createElement('script'); s.src = url(p); s.onload = res; s.onerror = () => rej(new Error('Could not load ' + p)); document.head.append(s);
+    const s = document.createElement('script'); s.src = scriptUrl(p); s.onload = res; s.onerror = () => rej(new Error('Could not load ' + p)); document.head.append(s);
   }));
 
   // ---------- speech engine (loaded on first use) ----------
@@ -330,7 +333,7 @@
   function on(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); if (ev === 'ready' && model) fn(); }
   function emit(ev, d) { (listeners[ev] || []).forEach(fn => { try { fn(d); } catch (e) { console.error(e); } }); }
 
-  window.CommKit = { version: '1.0.0', root: ROOT, ready, get isReady() { return !!model; }, on, readAloud, hear, listenFor, listen, speakAnswer, checkText, keyPoints, compareText, say, task, offline,
+  window.CommKit = { version: VERSION, root: ROOT, ready, get isReady() { return !!model; }, on, readAloud, hear, listenFor, listen, speakAnswer, checkText, keyPoints, compareText, say, task, offline,
     stop: () => (active ? active.stop() : Promise.resolve()) };
 
   // =====================================================================================

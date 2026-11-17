@@ -5,6 +5,7 @@ Speaking and writing practice for an English communication course, built to run 
 | Activity | Page | What the learner does | How it is checked |
 |---|---|---|---|
 | **Read aloud** | `index.html` | Reads a passage aloud | On the device (Vosk speech engine): missed, changed and added words, pace, pauses, rubric out of 10 |
+| **Unseen passage** | `unseen.html` | Reads a new passage once, without seeing it first (it appears when recording starts) | On the device: the same checks and rules as Read aloud, under test conditions (no highlighting); the first reading is the score; three comprehension questions; the recording can be played back or saved |
 | **Write** | `write.html` | Types an email, summary, opinion or reply | On the device: key points, length, common slips, structure, tone. **When online**, an AI model adds rubric marks, specific fixes and a better version |
 | **Speak** | `speak.html` | Records a self-introduction or an answer to a question | On the device: key points, speaking time, pace, pauses, clarity, common slips. **When online**, the AI marks content and grammar from the transcript (the audio never leaves the device) |
 
@@ -23,7 +24,7 @@ Written and spoken feedback both use the same six parts: level and score (out of
 | `tests/` | Unit tests for all the scoring rules and the server function |
 | `public/kit/` | CommKit: `commkit.js`, a demo page, its guide (`README.md`) and two example games |
 | `public/commkit-sw.js` | Offline cache for the course and CommKit pages |
-| `tools/` | `make_noisy_samples.py`: builds the noisy test recordings; `build_kit.sh`: builds `dist/commkit/` (`npm run kit`) |
+| `tools/` | `check_passage_words.py` (`npm run words`): checks every passage word is in the speech model's vocabulary (a word the model doesn't know would always be marked skipped); `make_noisy_samples.py`: builds the noisy test recordings; `build_kit.sh`: builds `dist/commkit/` (`npm run kit`) |
 | `docs/testing-on-tablet.md` | How to test on a tablet and inside the Android app, plus test results |
 | `docs/superpowers/specs/` | The design doc |
 | `downloads/` | The original Vosk model zips (not part of the website) |

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unseen Passage</title>
+<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/course.css?v=3">
+<style>
+  /* the passage card on the left, the recorder on the right (tablet and up) */
+  .work.unseen { grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 56.25em) { .work.unseen { grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr); } .work.unseen .rec { position: sticky; top: 16px; } }
+  .sheet { --lh: 2.75rem; position: relative; min-height: 340px; }
+  @media (min-width: 37.5em) { .sheet { --lh: 3.25rem; } }
+  .sheet .paper-title { line-height: var(--lh); }
+  .text { margin: 0; font-size: clamp(1.25rem, 1rem + 1.2vw, 1.75rem); line-height: var(--lh); word-spacing: 2px; overflow-wrap: break-word;
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lh) - 1px), var(--rule) calc(var(--lh) - 1px), var(--rule) var(--lh));
+    background-position: 0 calc(var(--lh) * -0.18); }
+  /* covered until the reading starts */
+  .cover { position: absolute; inset: 0; border-radius: var(--r-xl); display: grid; place-items: center; text-align: center; padding: 24px;
+    background: rgba(255, 255, 255, .72); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }
+  .cover-in { max-width: 420px; display: grid; gap: 10px; justify-items: center; }
+  .cover h2 { margin: 0; font-size: 1.5rem; letter-spacing: -.02em; }
+  .cover p { margin: 0; color: #3d4250; }
+  .cover .chip { background: var(--tone); }
+  .blurred { filter: blur(7px); user-select: none; }
+
+  /* marks after reading */
+  .w { position: relative; border-radius: 4px; }
+  .w.skip { color: #8a93a3; text-decoration: underline dashed var(--fix) 2px; text-underline-offset: 7px; }
+  .w.change { text-decoration: underline wavy var(--fix) 2px; text-underline-offset: 7px; }
+  .w.change.minor { text-decoration-color: #d1a33c; }
+  .w.unclear { text-decoration: underline dotted #7d8799 2px; text-underline-offset: 7px; }
+  .w.tip { text-decoration: underline dotted var(--tip) 2px; text-underline-offset: 7px; }
+  .w[data-note]::before { content: attr(data-note); position: absolute; left: 50%; bottom: calc(100% - 12px); transform: translateX(-50%);
+    font: italic 600 .8125rem/1 var(--font); color: var(--fix); white-space: nowrap; pointer-events: none; }
+  .ins { position: relative; display: inline-block; width: 0; }
+  .ins::after { content: "^"; position: absolute; left: -6px; top: -4px; color: var(--fix); font-weight: 800; }
+  .ins::before { content: attr(data-note); position: absolute; left: 0; bottom: 1.6em; transform: translateX(-50%); font: italic 600 .8125rem/1 var(--font); color: var(--fix); white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .8125rem; color: var(--muted); }
+  .legend span::before { content: ""; display: inline-block; width: 18px; margin-right: 6px; vertical-align: middle; border-bottom: 2px dashed var(--fix); }
+  .legend .l-change::before { border-bottom: 2px solid var(--fix); }
+  .legend .l-minor::before { border-bottom: 2px solid #d1a33c; }
+  .legend .l-unclear::before { border-bottom: 2px dotted #7d8799; }
+
+  /* recorder */
+  .rec .eyebrow { text-align: center; }
+  .progressbar { width: 100%; max-width: 360px; height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+  .progressbar i { display: block; height: 100%; width: 0; background: var(--path); border-radius: 99px; transition: width .3s; }
+  .tips { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: .875rem; color: var(--muted); text-align: left; width: 100%; }
+  .tips li::before { content: "•"; color: var(--path); font-weight: 800; margin-right: 8px; }
+  .notes li { color: #3d4250; }
+  .quiz fieldset { border: 0; margin: 0 0 14px; padding: 0; }
+  .quiz legend { font-weight: 650; margin-bottom: 8px; }
+  .quiz label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; }
+  .quiz label.right { background: var(--mint); border-color: transparent; } .quiz label.wrong { background: var(--fix-soft); border-color: transparent; }
+  .first { display: inline-flex; gap: 6px; align-items: center; font-size: .8125rem; font-weight: 700; border-radius: 99px; padding: 3px 10px; background: var(--mint); color: var(--mint-ink); }
+  .first.practice { background: var(--soft); color: var(--muted); }
+</style>
+</head>
+<body data-kind="read">
+<header class="topbar" id="topbar"></header>
+<div class="panel">
+<div class="pagehead">
+  <div><p class="crumb">Communication Skills · Reading</p><h1>Unseen passage</h1></div>
+  <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
+</div>
+<main>
+  <section aria-label="Choose a passage"><div class="lessons" id="lessons"></div></section>
+
+  <ol class="steps" id="steps" aria-label="Steps">
+    <li data-step="ready"><span class="n">1</span><span class="lb">Get ready</span></li>
+    <li data-step="read"><span class="n">2</span><span class="lb">Read aloud</span></li>
+    <li data-step="results"><span class="n">3</span><span class="lb">Results</span></li>
+  </ol>
+
+  <div class="work unseen">
+    <section class="paper notebook sheet" aria-label="Passage">
+      <p class="paper-title" id="title">Unseen passage</p>
+      <p class="text" id="text"></p>
+      <div class="cover" id="cover">
+        <div class="cover-in">
+          <span class="chip" id="meta"></span>
+          <h2>You haven't seen this passage yet</h2>
+          <p>When you tap <b>Start reading</b>, the passage appears and listening begins. Read it aloud once, from the first word to the last.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card rec" aria-live="polite" aria-label="Recorder">
+      <p class="eyebrow" id="recTitle">Get ready</p>
+      <div class="clock" id="clock">0:00</div>
+      <div class="progressbar" aria-hidden="true"><i id="readBar"></i></div>
+      <button id="mic" class="mic" type="button" aria-label="Start reading">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+      </button>
+      <p class="mic-label" id="micLabel">Tap to start reading</p>
+      <ul class="tips" id="tips">
+        <li>Find a quiet place and hold the tablet about an arm's length away.</li>
+        <li>Read at your normal speed. It stops by itself after the last word.</li>
+        <li>If you make a mistake, just correct it and carry on.</li>
+      </ul>
+      <button class="link-btn" id="sample" type="button" hidden>Try a sample recording</button>
+    </section>
+  </div>
+
+  <section class="fb" id="results" hidden aria-live="polite"></section>
+</main>
+</div>
+
+<div class="actionbar" id="actionbar" hidden>
+  <div class="actionbar-in">
+    <span class="grow" id="actionNote"></span>
+    <button type="button" class="btn secondary" id="again">Read it again</button>
+    <button type="button" class="btn primary" id="next">Next passage</button>
+  </div>
+</div>
+
+<script src="js/tasks.js?v=1"></script>
+<script src="js/course.js?v=3"></script>
+<script src="kit/commkit.js?v=1.1.0"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const LIST = Course.UNSEEN, LEVEL = ['', 'Level 1 · short and simple', 'Level 2 · a little longer', 'Level 3 · longer sentences'];
+// sample recordings for teachers and testing (unseen.html?sample=1); learners never see them
+const SAMPLES = { 'u-kite': 'samples/unseen/u-kite.wav', 'u-garden': 'samples/unseen/u-garden-mistakes.wav' };
+const RULE = { skip: 'skipped', 'stopped-early': 'not read (stopped early)', added: 'added', 'similar-word': 'look-alike word', order: 'word order',
+  'dropped-ending': 'dropped ending', 'added-ending': 'added ending', tense: 'tense', 'first-letter': 'guessed from the first letter', number: 'number',
+  changed: 'changed', 'small-word': 'small word', 'same-meaning': 'same meaning', punctuation: 'said the punctuation', unclear: 'hard to understand',
+  repeat: 'repeated a word', 'lost-place': 're-read a line', filler: 'filler word', 'long-hesitation': 'long pause', 'self-correction': 'corrected yourself',
+  'title-or-instructions': 'read the title first', accent: 'sound tip', name: 'name said differently' };
+let item = null, reading = null, clockId = 0, startedAt = 0, result = null;
+
+// ---------- saved attempts: the first reading of each passage is its unseen score ----------
+const saved = () => store.get('rc-unseen', {});
+function save(id, r, quiz) {
+  const all = saved(), rec = all[id] || { tries: 0 };
+  const entry = { at: new Date().toISOString(), total: r.score, acc: r.accuracy, wcpm: r.wcpm, errors: r.counts.errors, minor: r.counts.minor, quiz };
+  if (!rec.first) rec.first = entry; else rec.last = entry;
+  rec.tries++; all[id] = rec; store.set('rc-unseen', all);
+  return rec.tries === 1;
+}
+
+// ---------- lessons, steps ----------
+function renderLessons() {
+  const all = saved();
+  $('lessons').innerHTML = LIST.map((p, i) => {
+    const s = all[p.id], n = p.text.split(/\s+/).length;
+    return `<button type="button" class="lesson anim" data-id="${p.id}" aria-pressed="${item && item.id === p.id}">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${s ? '<path d="M3 5h6a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H3z"/><path d="M21 5h-6a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h7z"/>' : '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'}</svg></span>
+      <span class="nm">${s ? esc(p.title) : `Unseen passage ${i + 1}`}</span>
+      <span class="sub">Level ${p.level} · ${n} words ${s ? `<span class="pill done">Done · ${s.first.total}/10</span>` : '<span class="pill new">New</span>'}</span>
+    </button>`;
+  }).join('');
+  const done = LIST.filter(p => all[p.id]).length;
+  $('progFill').style.width = `${(done / LIST.length) * 100}%`;
+  $('progText').textContent = `${done} of ${LIST.length} read`;
+  Course.mountTopbar('read');
+}
+$('lessons').addEventListener('click', e => { const b = e.target.closest('.lesson'); if (b && !reading) show(b.dataset.id); });
+function setStep(step) {
+  const order = ['ready', 'read', 'results'];
+  document.querySelectorAll('#steps li').forEach(li => {
+    const i = order.indexOf(li.dataset.step), cur = order.indexOf(step);
+    li.className = i === cur ? 'on' : i < cur ? 'past' : '';
+    li.setAttribute('aria-current', i === cur ? 'step' : 'false');
+  });
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const nextUnread = () => LIST.find(p => !saved()[p.id]) || LIST[0];
+
+// ---------- one passage ----------
+function show(id) {
+  item = LIST.find(p => p.id === id) || nextUnread();
+  const seen = !!saved()[item.id];
+  $('title').textContent = seen ? item.title : 'Unseen passage';
+  // the real text sits under the cover, blurred, so the page keeps its size; it is only readable once reading starts
+  $('text').innerHTML = item.text.split(/\s+/).map(t => `<span class="w">${esc(t)}</span>`).join(' ');
+  $('text').classList.add('blurred'); $('text').setAttribute('aria-hidden', 'true');
+  $('cover').hidden = false;
+  $('meta').textContent = `${LEVEL[item.level]} · ${item.text.split(/\s+/).length} words`;
+  $('cover').querySelector('h2').textContent = seen ? 'You have read this passage before' : 'You haven’t seen this passage yet';
+  $('results').hidden = true; $('actionbar').hidden = true;
+  $('clock').textContent = '0:00'; $('readBar').style.width = '0%';
+  $('recTitle').textContent = 'Get ready'; $('tips').hidden = false;
+  $('sample').hidden = !(new URLSearchParams(location.search).has('sample') && SAMPLES[item.id]);
+  setMic('idle', seen ? 'Tap to read it again (practice)' : 'Tap to start reading');
+  setStep('ready'); renderLessons();
+}
+function setMic(state, label, err) {
+  $('mic').classList.toggle('recording', state === 'recording');
+  $('mic').disabled = state === 'busy';
+  $('mic').setAttribute('aria-label', state === 'recording' ? 'Finish reading' : 'Start reading');
+  $('micIcon').innerHTML = state === 'recording' ? '<rect x="6" y="6" width="12" height="12" rx="2"/>'
+    : '<path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>';
+  $('micLabel').textContent = label; $('micLabel').classList.toggle('err', !!err);
+}
+
+async function start(audio) {
+  if (reading) return;
+  setMic('busy', CommKit.isReady ? 'Starting…' : 'Getting the listener ready…');
+  if (!(await CommKit.ready())) { setMic('idle', 'The listener could not load. Open this page through the web server, not as a file.', true); return; }
+  // reveal the passage and start listening at the same moment
+  $('cover').hidden = true; $('text').classList.remove('blurred'); $('text').removeAttribute('aria-hidden');
+  $('title').textContent = item.title; $('tips').hidden = true; $('recTitle').textContent = audio ? 'Checking a sample' : 'Reading';
+  setStep('read');
+  const total = item.text.split(/\s+/).length;
+  reading = CommKit.readAloud({ text: item.text, audio, maxSeconds: 240,
+    onProgress: (i, n) => { $('readBar').style.width = `${Math.round(((i + 1) / n) * 100)}%`; },
+    onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)) });
+  if (!audio) {
+    startedAt = performance.now();
+    clockId = setInterval(() => { $('clock').textContent = fmt((performance.now() - startedAt) / 1000); }, 250);
+    setMic('recording', 'Listening… tap to finish');
+  } else setMic('busy', 'Checking the sample…');
+  try {
+    const r = await reading.done;
+    results(r);
+  } catch (e) {
+    show(item.id); setMic('idle', e.message, true);
+  } finally { clearInterval(clockId); reading = null; }
+}
+function finish() { if (reading) { setMic('busy', 'Checking your reading…'); reading.stop(); } }
+
+// ---------- results ----------
+function markPassage(r) {
+  const spans = [...$('text').querySelectorAll('.w')].filter(s => CommKit && s.textContent.replace(/[^A-Za-z0-9]/g, ''));
+  $('text').querySelectorAll('.ins').forEach(e => e.remove());
+  r.analysis.words.forEach((w, k) => {
+    const s = spans[k]; if (!s) return;
+    s.className = 'w' + (w.status !== 'ok' ? ' ' + w.status : '') + (w.outcome === 'minor' ? ' minor' : '');
+    if (w.status === 'change' && w.heard) s.dataset.note = w.heard; else delete s.dataset.note;
+    s.title = w.rule ? `${RULE[w.rule] || w.rule}${w.cost > 0 ? (w.outcome === 'minor' ? ' (minor error)' : ' (error)') : ' (not counted)'}` : '';
+  });
+  r.analysis.extras.filter(x => x.kind === 'added').forEach(x => {
+    const ins = document.createElement('span'); ins.className = 'ins'; ins.dataset.note = x.word; ins.title = 'Added word';
+    const anchor = x.before >= 0 ? spans[x.before] : null; if (anchor) anchor.before(ins); else $('text').append(' ', ins);
+  });
+}
+function results(r) {
+  result = r;
+  setStep('results');
+  const a = r.analysis, box = $('results');
+  if (r.tooNoisy || r.heardTooLittle) {
+    show(item.id);
+    setMic('idle', r.tooNoisy ? 'It was too noisy to check. Move somewhere quieter and try again.' : 'I could not hear enough. Hold the tablet closer and read the whole passage.', true);
+    return;
+  }
+  markPassage(r);
+  const first = !saved()[item.id];
+  const counted = [...a.words, ...a.extras].filter(m => m.cost > 0);
+  const notCounted = [...a.extras.filter(x => x.outcome === 'note' || x.rule === 'self-correction'), ...a.words.filter(w => w.rule === 'self-correction' || w.rule === 'name' || w.rule === 'accent')];
+  const noteLines = [...notCounted.map(m => `${RULE[m.rule] || m.rule}: “${esc(m.word || m.raw)}”`), ...a.notes.filter(n => n.rule === 'long-hesitation').map(n => `long pause (${n.gap} s) before “${esc(n.word)}”`)];
+  const sec = Math.round(a.readingSec);
+  box.innerHTML = `
+    <section class="card scorecard">
+      ${AnswerRing(r.score, 10)}
+      <div><p class="lvl">${esc(r.headline)}</p><p class="lvl-sub">${esc(r.tip)}</p>
+        <div class="tags"><span class="first ${first ? '' : 'practice'}">${first ? 'First reading · this is your unseen score' : 'Practice reading · your first score stays'}</span></div></div>
+    </section>
+    <section class="card">
+      <h2>Your reading</h2>
+      <div class="facts">
+        <div class="fact"><b>${r.marks.accuracy}/4</b><span>accuracy · ${r.accuracy}% of words right</span></div>
+        <div class="fact"><b>${r.marks.pace}/3</b><span>pace · ${r.wcpm} words a minute</span></div>
+        <div class="fact"><b>${r.marks.phrasing}/3</b><span>phrasing · pauses in the right places</span></div>
+        <div class="fact"><b>${fmt(sec)}</b><span>reading time</span></div>
+      </div>
+    </section>
+    <div class="two">
+      <section class="card"><h2>What counted</h2>
+        ${counted.length ? `<ul class="list fix">${counted.slice(0, 8).map((m, k) => `<li><span class="dot">${k + 1}</span><span><b>${esc(RULE[m.rule] || m.rule)}</b>: “${esc(m.raw || m.word)}”${m.heard && m.rule !== 'skip' && m.rule !== 'stopped-early' ? ` read as “${esc(m.heard)}”` : ''}${m.outcome === 'minor' ? ' <span class="why" style="display:inline">(minor, counts ½)</span>' : ''}</span></li>`).join('')}</ul>${counted.length > 8 ? `<p class="ai-note">and ${counted.length - 8} more, marked on the passage.</p>` : ''}`
+          : '<p class="ai-note">Nothing counted against you. Every word was read correctly.</p>'}
+        <p class="ai-note">${a.counts.errors} error${a.counts.errors === 1 ? '' : 's'}${a.counts.minor ? `, ${a.counts.minor} minor` : ''}${a.counts.unclearCounted ? `, ${a.counts.unclearCounted} hard to understand` : ''}.</p>
+      </section>
+      <section class="card"><h2>Not counted</h2>
+        ${noteLines.length ? `<ul class="list good notes">${noteLines.slice(0, 8).map(t => `<li><span class="dot">i</span><span>${t}</span></li>`).join('')}</ul>` : '<p class="ai-note">No repeats, long pauses or corrections.</p>'}
+        <p class="ai-note">Corrections, repeats, fillers, accents and long pauses are noted for your teacher but never lower your score.</p>
+      </section>
+    </div>
+    <section class="card">
+      <h2>Listen</h2>
+      <div class="legend"><span>skipped</span><span class="l-change">changed</span><span class="l-minor">minor slip</span><span class="l-unclear">hard to understand</span><span style="--x:0">^ added word</span></div>
+      ${r.recording ? `<p style="margin:14px 0 0; display:flex; gap:10px; flex-wrap:wrap"><button class="btn secondary" id="play" type="button">▶ Hear your reading</button><button class="btn secondary" id="saveRec" type="button">Save the recording</button></p>` : ''}
+    </section>
+    <section class="card quiz">
+      <h2>Did you understand?</h2>
+      <form id="quiz">${item.questions.map((q, k) => `<fieldset><legend>${k + 1}. ${esc(q.q)}</legend>${q.options.map((o, j) => `<label><input type="radio" name="q${k}" value="${j}"> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
+        <button class="btn primary" type="submit" id="quizBtn" disabled>Check my answers</button></form>
+      <p class="ai-note" id="quizOut"></p>
+    </section>`;
+  box.hidden = false;
+  const isFirst = save(item.id, r, null);
+  result.isFirst = isFirst;
+  $('actionNote').textContent = `${isFirst ? 'Unseen score' : 'Practice'} · ${r.score}/10`;
+  $('actionbar').hidden = false;
+  setMic('idle', 'Tap to read it again (practice)');
+  $('recTitle').textContent = 'Finished';
+  renderLessons();
+  const pl = $('play'); if (pl) pl.onclick = () => new Audio(r.recording).play();
+  const sv = $('saveRec'); if (sv) sv.onclick = async () => {
+    const blob = await (await fetch(r.recording)).blob(), ext = /ogg/.test(blob.type) ? 'ogg' : /mp4|aac/.test(blob.type) ? 'm4a' : /wav/.test(blob.type) ? 'wav' : 'webm';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${item.id}-${new Date().toISOString().slice(0, 10)}.${ext}`; a.click();
+  };
+  const form = $('quiz');
+  form.addEventListener('change', () => { $('quizBtn').disabled = item.questions.some((_, k) => !form.querySelector(`[name=q${k}]:checked`)); });
+  form.onsubmit = e => {
+    e.preventDefault();
+    const picks = item.questions.map((_, k) => +form.querySelector(`[name=q${k}]:checked`).value);
+    const right = picks.filter((p, k) => p === item.questions[k].answer).length;
+    item.questions.forEach((q, k) => form.querySelectorAll(`[name=q${k}]`).forEach((inp, j) => {
+      inp.disabled = true; const l = inp.closest('label');
+      if (j === q.answer) l.classList.add('right'); else if (j === picks[k]) l.classList.add('wrong');
+    }));
+    $('quizBtn').hidden = true;
+    $('quizOut').textContent = `${right} of ${item.questions.length} correct.`;
+    // the answers belong to the reading they follow: the first reading keeps them, a practice reading has its own
+    const all = saved(), rec = all[item.id];
+    if (rec) { (r.isFirst ? rec.first : rec.last).quiz = right; store.set('rc-unseen', all); }
+  };
+  box.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+}
+function AnswerRing(total, max) {
+  const r = 40, c = 2 * Math.PI * r;
+  return `<svg class="ring" viewBox="0 0 96 96" role="img" aria-label="${total} out of ${max}"><circle class="bg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9"/>
+    <circle class="fg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9" stroke-dasharray="${(c * total / max).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 48 48)"/>
+    <text x="48" y="52" text-anchor="middle">${total}<tspan class="of" dx="1">/${max}</tspan></text></svg>`;
+}
+
+$('mic').onclick = () => (reading ? finish() : start());
+$('sample').onclick = () => start(SAMPLES[item.id]);
+$('again').onclick = () => { show(item.id); scrollTo({ top: 0, behavior: 'smooth' }); };
+$('next').onclick = () => {
+  const i = LIST.indexOf(item), unread = LIST.find((p, k) => k > i && !saved()[p.id]) || LIST.find(p => !saved()[p.id]) || LIST[(i + 1) % LIST.length];
+  show(unread.id); scrollTo({ top: 0, behavior: 'smooth' });
+};
+show(new URLSearchParams(location.search).get('p') || nextUnread().id);
+CommKit.ready(); // load the listener while the learner gets ready
+</script>
+</body>
+</html>
