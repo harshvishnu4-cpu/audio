@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Speaking Practice</title>
-<link rel="stylesheet" href="css/course.css?v=2">
+<link rel="stylesheet" href="css/base.css?v=1">
+<link rel="stylesheet" href="css/course.css?v=3">
 </head>
 <body>
 <header class="appbar">
@@ -54,10 +55,18 @@
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
       </button>
       <p class="mic-label" id="micLabel">Getting the listener ready…</p>
-      <p class="live" id="live"></p>
       <div class="samples" id="samples"></div>
     </section>
   </div>
+
+  <section class="paper notebook said" aria-label="What you said">
+    <p class="paper-title">What you said</p>
+    <p class="paper-text ruled said-text" id="said" aria-live="polite" data-empty="Your words will be written here as you speak."></p>
+    <div class="paper-foot" id="saidFoot" hidden>
+      <span class="grow">Key points are <span class="said-text"><span class="kp">highlighted</span></span>; filler words are <span class="said-text"><span class="f">underlined</span></span>. The device can mishear some words, especially names.</span>
+      <button type="button" class="link-btn" id="playMine" hidden>▶ Hear my answer</button>
+    </div>
+  </section>
 
   <section class="fb" id="feedback" hidden aria-live="polite"></section>
 </main>
@@ -74,7 +83,7 @@
 <script src="lib/vosk.js"></script>
 <script src="js/tasks.js?v=1"></script>
 <script src="js/answer-scoring.js?v=2"></script>
-<script src="js/answer-ui.js?v=2"></script>
+<script src="js/answer-ui.js?v=3"></script>
 <script src="js/speech.js?v=1"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -134,7 +143,7 @@ function showTask(id) {
   $('zone').style.left = `${(task.minSec / scale) * 100}%`; $('zone').style.width = `${((task.maxSec - task.minSec) / scale) * 100}%`;
   $('zoneLbl').textContent = `target ${task.minSec}–${task.maxSec} s`;
   $('clock').textContent = '0:00'; $('now').style.width = '0%';
-  $('live').textContent = '';
+  clearSaid();
   $('samples').innerHTML = '';
   for (const s of SAMPLES.filter(s => s.task === task.id)) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'link-btn'; b.textContent = s.label;
@@ -169,10 +178,10 @@ async function startListening() {
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }); }
   catch (e) { setMic('idle', 'The microphone is blocked. Allow microphone access for this page, then tap again.', true); return; }
-  $('feedback').hidden = true; $('actionbar').hidden = true; $('live').textContent = ''; tickChips('');
+  $('feedback').hidden = true; $('actionbar').hidden = true; clearSaid(); tickChips('');
   setStep('speak');
   live = await Speech.listen({ stream, onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)),
-    onPartial: t => { $('live').textContent = t.split(' ').slice(-16).join(' '); tickChips(t); } });
+    onPartial: t => { $('said').textContent = t; tickChips(t); } });
   startedAt = performance.now(); timerId = setInterval(tick, 250);
   setMic('recording', 'Listening… tap to stop when you finish');
 }
@@ -189,34 +198,26 @@ async function runSample(s) {
 }
 
 // ---------- feedback ----------
-function ring(total, max) {
-  const r = 40, c = 2 * Math.PI * r, f = total / max;
-  return `<svg class="ring" viewBox="0 0 96 96" role="img" aria-label="${total} out of ${max}">
-    <circle class="bg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9"/>
-    <circle class="fg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 48 48)"/>
-    <text x="48" y="52" text-anchor="middle">${total}<tspan class="of" dx="1">/${max}</tspan></text></svg>`;
+function clearSaid() { $('said').textContent = ''; $('saidFoot').hidden = true; $('playMine').hidden = true; }
+// The final transcript on the paper: key-point words highlighted, fillers underlined.
+function writeSaid(heard, cov) {
+  const words = heard.words.filter(w => w.word !== '[unk]').map(w => w.word);
+  const mark = new Array(words.length).fill('');
+  for (const c of cov) {
+    if (!c.hit || !c.evidence) continue;
+    const ev = c.evidence.toLowerCase().split(/\s+/);
+    for (let i = 0; i + ev.length <= words.length; i++) {
+      if (ev.every((e, k) => words[i + k] === e.replace(/[^a-z']/g, ''))) { for (let k = 0; k < ev.length; k++) mark[i + k] = 'kp'; break; }
+    }
+  }
+  $('said').innerHTML = words.map((w, i) => FILLERS.has(w) ? `<span class="f">${esc(w)}</span>` : mark[i] ? `<span class="kp">${esc(w)}</span>` : esc(w)).join(' ');
+  $('saidFoot').hidden = false;
+  $('playMine').hidden = !heard.playUrl;
 }
-function feedbackHTML(r, heard, note, t) {
+$('playMine').onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };
+function factsHTML(r, t) {
   const s = r.stats;
-  const crit = r.criteria.map(c => `<div class="crit">
-      <div class="crit-top"><span class="crit-nm">${esc(c.label)}</span><span class="crit-sc">${c.score}/4</span></div>
-      <div class="segs" aria-hidden="true">${[1, 2, 3, 4].map(k => `<i class="${k <= c.score ? 'on' : ''}"></i>`).join('')}</div>
-      <p>${esc(c.reason)}</p>
-      ${c.by === 'ai' ? '<span class="by">Checked with AI</span>' : (c.id === 'fluency' || c.id === 'clarity') ? '<span class="by">Measured on the device</span>' : ''}
-    </div>`).join('');
-  const well = r.well.length ? `<ul class="list good">${r.well.map(w => `<li><span class="dot">✓</span><span>${esc(w)}</span></li>`).join('')}</ul>` : '<p class="ai-note">Your next try will show what went well.</p>';
-  const fix = r.improve.length ? `<ul class="list fix">${r.improve.map((i, k) => `<li><span class="dot">${k + 1}</span><span>${i.quote ? `<span class="q">${esc(i.quote)}</span>` : ''}${i.quote && i.better ? ' → ' : ''}${i.better ? `<span class="b">${esc(i.better)}</span>` : ''}<span class="why">${esc(i.why)}</span></span></li>`).join('')}</ul>` : '<p class="ai-note">Nothing important to fix. Well done.</p>';
-  // offline, the device's "better version" is the raw transcript with misheard words; only the AI's is worth showing
-  const better = r.source === 'ai' && r.corrected && r.corrected.trim() !== String(r.transcript || '').trim() ? AnswerUI.diffMark(String(r.transcript || ''), r.corrected) : null;
-  const transcript = heard.words.filter(w => w.word !== '[unk]').map(w => FILLERS.has(w.word) ? `<span class="f">${esc(w.word)}</span>` : esc(w.word)).join(' ');
-  return `
-    <section class="card scorecard">
-      ${ring(r.total, r.max)}
-      <div><p class="lvl">${esc(r.level)}</p><p class="lvl-sub">${esc(r.summary || r.headline)}</p>
-        <div class="tags"><span class="tag ${r.source === 'ai' ? 'ai' : ''}">${r.source === 'ai' ? 'Checked with AI and on the device' : 'Checked on the device'}</span></div>
-        ${note ? `<p class="ai-note">${esc(note)}</p>` : ''}</div>
-    </section>
-    <section class="card">
+  return `<section class="card">
       <h2>Your speaking</h2>
       <div class="facts">
         <div class="fact"><b>${fmt(s.speechSec)}</b><span>speaking time (target ${t.minSec}–${t.maxSec} s)</span></div>
@@ -224,27 +225,14 @@ function feedbackHTML(r, heard, note, t) {
         <div class="fact"><b>${s.fillers}</b><span>filler words</span></div>
         <div class="fact"><b>${s.longPauses}</b><span>long pauses</span></div>
       </div>
-    </section>
-    <section class="card"><h2>How you did</h2><div class="crits">${crit}</div></section>
-    <div class="two">
-      <section class="card"><h2>What went well</h2>${well}</section>
-      <section class="card"><h2>Things to improve</h2>${fix}</section>
-    </div>
-    ${better ? `<section class="card"><h2>A better version of your answer</h2><p class="better">${better}</p></section>`
-      : `<section class="card"><h2>A model answer</h2><p class="better">${esc(t.model)}</p><p class="ai-note">Use it for ideas, then say it in your own words.</p></section>`}
-    <section class="card">
-      <details class="more"><summary>What the device heard</summary><p class="transcript">${transcript || '(nothing)'}</p>
-        <p class="ai-note">Filler words are marked. The device can mishear some words, especially names.</p></details>
-      ${heard.playUrl ? '<p style="margin:12px 0 0"><button type="button" class="link-btn" id="playMine">▶ Hear my answer</button></p>' : ''}
-      ${better ? `<details class="more" style="margin-top:12px"><summary>See a model answer</summary><p class="better" style="margin-top:10px">${esc(t.model)}</p></details>` : ''}
     </section>`;
 }
 
 async function show(heard) {
   const t = task, id = ++checking;
   const device = AnswerScore.evaluateSpoken(t, heard.words, { silences: heard.silences, durationSec: heard.durationSec, snrDb: heard.snrDb });
-  $('live').textContent = '';
   tickChips(device.transcript || '');
+  writeSaid(heard, AnswerScore.coverage(t, AnswerScore.tokens(device.transcript || '')));
   $('playback').src = heard.playUrl || '';
   setMic('idle', 'Tap to try again');
   if (device.refused) {
@@ -252,8 +240,8 @@ async function show(heard) {
     $('feedback').hidden = false; setStep('speak'); return;
   }
   const draw = (r, note) => {
-    $('feedback').innerHTML = feedbackHTML(r, heard, note, t);
-    const pm = $('playMine'); if (pm) pm.onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };
+    // offline, the device's "better version" is the raw transcript with misheard words; only the AI's is worth showing
+    $('feedback').innerHTML = AnswerUI.feedbackCards(r, { original: r.transcript, note, model: t.model, showBetter: r.source === 'ai', middle: factsHTML(r, t) });
     $('feedback').hidden = false; $('actionbar').hidden = false;
     $('actionNote').textContent = `${r.level} · ${r.total}/16`;
   };
@@ -272,7 +260,7 @@ async function show(heard) {
 }
 
 $('mic').onclick = () => (live ? stopListening() : startListening());
-$('retry').onclick = () => { $('feedback').hidden = true; $('actionbar').hidden = true; setStep('prep'); tickChips(''); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+$('retry').onclick = () => { $('feedback').hidden = true; $('actionbar').hidden = true; setStep('prep'); tickChips(''); clearSaid(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('next').onclick = () => {
   const list = AnswerTasks.SPEAK, i = list.findIndex(t => t.id === task.id);
   showTask(list[(i + 1) % list.length].id); window.scrollTo({ top: 0, behavior: 'smooth' });

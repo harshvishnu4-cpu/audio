@@ -9,6 +9,7 @@
   small model) running inside a WebView is fast and accurate enough to catch skipped / wrong /
   extra words when a learner reads a passage aloud. Not production code.
 -->
+<link rel="stylesheet" href="css/base.css?v=1">
 <style>
   :root {
     --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0; --edge: #c3cad6;
@@ -54,11 +55,6 @@
   button, select, textarea, input { font: inherit; color: inherit; }
   button, select, label { touch-action: manipulation; }
   :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
-
-  /* activity switcher (same as css/answer.css) */
-  .activities { display: flex; justify-content: center; gap: 4px; padding: 8px var(--gutter) 0; }
-  .activities a { text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.9375rem; padding: 6px 14px; border-radius: 99px; }
-  .activities a[aria-current="page"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
 
   /* top bar */
   .bar { max-width: var(--max); margin: 0 auto; padding: var(--bar-top) var(--gutter) 4px; display: flex; gap: 10px; align-items: center; }
@@ -359,50 +355,101 @@
     :root { --max: 1200px; --gutter: 16px; --bar-top: 8px; --lh: 3rem; --pad-left: 3rem; --pad-right: 20px;
             --fs-passage: 1.5rem; --fs-title: 1.125rem; --fs-note: 1rem; --fs-pick: 1.1875rem; --fs-verdict: 1.25rem;
             --grade-w: 5rem; --grade-h: 3.75rem; --grade-fs: 1.625rem; --grade-top: 8px; --grade-right: 10px; --mic: 72px; }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 30%); gap: 16px; align-items: start; padding-top: 0; }
+    .work { grid-template-columns: minmax(0, 1fr) minmax(190px, 30%); gap: 16px; }
     .controls { position: -webkit-sticky; position: sticky; top: 12px; margin-top: 0; gap: 8px; }
     .controls .mic { order: -2; margin-top: 6px; }
     .controls .mic-label { order: -1; font-size: 0.9375rem; }
     .stats { gap: 2px 14px; font-size: 0.875rem; }
     .key { margin-top: 4px; gap: 2px 14px; }
   }
+
+  /* ===== course shell: shared look in css/base.css; these are the Read aloud page's own tweaks ===== */
+  :root { --max: 1080px; }
+  body { background: var(--bg); }
+  .progress .track { width: 90px; }
+  .modes { background: var(--soft); }
+  main { max-width: var(--max); display: grid; gap: 18px; padding: 18px var(--gutter) 110px; }
+  @media (min-width: 56.25em) { .work { grid-template-columns: minmax(0, 1.75fr) minmax(250px, 1fr); } .reccard { position: sticky; top: 16px; } }
+  .page { border-radius: var(--r-lg); box-shadow: var(--shadow); }
+  .reccard, .scorecard-wrap, .analysis, .quiz { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+  .reccard { margin-top: 0; padding: 22px 18px; gap: 12px; }
+  .eyebrow { margin: 0; }
+  .clock { font-size: 2.25rem; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: -.5px; color: var(--text); line-height: 1.1; }
+  .scorecard-wrap { padding: 20px 18px; display: grid; gap: 14px; }
+  @media (min-width: 37.5em) { .scorecard-wrap { padding: 22px 24px; } }
+  .scorecard { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .scorecard .verdict { text-align: left; }
+  .scorecard .lead { text-align: left; max-width: none; }
+  .scorecard .score-line { justify-content: flex-start; margin-top: 6px; }
+  .score-text > * + * { margin-top: 4px; }
+  .scorecard-wrap .after, .scorecard-wrap .key { justify-content: flex-start; margin: 0; }
+  .scorecard-wrap .note { margin: 0; max-width: none; }
+  .analysis, .quiz { margin-top: 0; }
 </style>
 </head>
 <body>
-<nav class="activities" aria-label="Activity">
-  <a href="index.html" aria-current="page">Read aloud</a>
-  <a href="write.html">Write</a>
-  <a href="speak.html">Speak</a>
-</nav>
-<header class="bar">
-  <div class="picker">
-    <select id="passageSelect" aria-label="Choose a passage"></select>
+<header class="appbar">
+  <div class="appbar-in">
+    <p class="crumb">Communication Skills · Reading</p>
+    <div class="title-row">
+      <h1>Reading practice</h1>
+      <div class="title-tools">
+        <div class="progress" aria-label="Your progress"><div class="track"><div class="fill" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
+        <div class="modes" role="group" aria-label="Practice or test">
+          <button type="button" id="modePractice" aria-pressed="true">Practice</button>
+          <button type="button" id="modeTest" aria-pressed="false">Test</button>
+        </div>
+        <button class="tools-btn" id="toolsBtn" type="button">Tools</button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Activity">
+      <a href="index.html" aria-current="page">Read aloud</a>
+      <a href="write.html">Write</a>
+      <a href="speak.html">Speak</a>
+    </nav>
   </div>
-  <div class="modes" role="group" aria-label="Practice or test">
-    <button type="button" id="modePractice" aria-pressed="true">Practice</button>
-    <button type="button" id="modeTest" aria-pressed="false">Test</button>
-  </div>
-  <button class="tools-btn" id="toolsBtn" type="button">Tools</button>
+  <!-- the passage list the reading logic uses; the lesson cards drive it -->
+  <select id="passageSelect" class="sr-only" aria-hidden="true" tabindex="-1"></select>
 </header>
 
 <main>
-  <article class="page" aria-labelledby="pageTitle">
-    <div id="grade" class="grade" hidden></div>
-    <h2 id="pageTitle"></h2>
-    <p id="passage" class="passage"></p>
-  </article>
+  <section aria-label="Choose a passage"><div class="lessons" id="lessons"></div></section>
 
-  <section class="controls" aria-live="polite">
-    <p id="verdict" class="verdict"></p>
-    <p id="lead" class="lead" hidden></p>
-    <p id="scoreLine" class="score-line" hidden></p>
-    <button id="mic" class="mic" type="button" disabled aria-label="Start reading">
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon">
-        <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
-      </svg>
-    </button>
-    <div id="micLabel" class="mic-label">Getting the listener ready…</div>
-    <p id="modeNote" class="mode-note"></p>
+  <ol class="steps" id="steps" aria-label="Steps">
+    <li data-step="prep"><span class="n">1</span><span class="lb">Prepare</span></li>
+    <li data-step="read"><span class="n">2</span><span class="lb">Read aloud</span></li>
+    <li data-step="feedback"><span class="n">3</span><span class="lb">Feedback</span></li>
+  </ol>
+
+  <div class="work">
+    <article class="page" aria-labelledby="pageTitle">
+      <div id="grade" class="grade" hidden></div>
+      <h2 id="pageTitle"></h2>
+      <p id="passage" class="passage"></p>
+    </article>
+
+    <section class="controls reccard" aria-live="polite" aria-label="Recorder">
+      <p class="eyebrow">Read the passage aloud</p>
+      <div class="clock" id="clock">0:00</div>
+      <button id="mic" class="mic" type="button" disabled aria-label="Start reading">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon">
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>
+        </svg>
+      </button>
+      <div id="micLabel" class="mic-label">Getting the listener ready…</div>
+      <p id="modeNote" class="mode-note"></p>
+    </section>
+  </div>
+
+  <section class="scorecard-wrap" id="scoreCard" hidden aria-live="polite">
+    <div class="scorecard">
+      <div id="ring"></div>
+      <div class="score-text">
+        <p id="verdict" class="verdict"></p>
+        <p id="lead" class="lead" hidden></p>
+        <p id="scoreLine" class="score-line" hidden></p>
+      </div>
+    </div>
     <div id="after" class="after" hidden>
       <button id="playAll" class="ghost" type="button">Hear my reading</button>
       <button id="reviewBtn" class="ghost" type="button">Teacher review</button>
@@ -413,7 +460,7 @@
       <span class="chip added">Added ^</span>
       <span class="chip tip">Sound tip</span>
       <span class="chip unclear">Unclear</span>
-      <span>Tap a marked word to see more.</span>
+      <span>Tap a marked word on the passage to see more.</span>
     </p>
     <p id="note" class="note" hidden></p>
   </section>
@@ -470,6 +517,13 @@
     </div>
   </section>
 </main>
+<div class="actionbar" id="actionbar" hidden>
+  <div class="actionbar-in">
+    <span class="grow" id="actionNote"></span>
+    <button type="button" class="btn secondary" id="retry">Try again</button>
+    <button type="button" class="btn primary" id="nextPassage">Next passage</button>
+  </div>
+</div>
 <div id="tlTip" class="tl-tip" role="tooltip" hidden></div>
 <div id="wordPop" class="wordpop" role="dialog" aria-label="About this word" hidden></div>
 
@@ -737,9 +791,56 @@ function setAppMode(m) {
 }
 
 function clearResult() {
-  for (const id of ['grade', 'lead', 'scoreLine', 'after', 'key', 'note', 'analysis', 'quiz', 'tlTip', 'wordPop']) $(id).hidden = true;
+  for (const id of ['grade', 'lead', 'scoreLine', 'after', 'key', 'note', 'analysis', 'quiz', 'tlTip', 'wordPop', 'scoreCard', 'actionbar']) $(id).hidden = true;
   $('verdict').textContent = '';
+  $('ring').innerHTML = '';
 }
+
+// ---------- course shell: lesson cards, steps, progress ----------
+const LESSON_ICONS = {
+  'morning-walk': '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  'good-listener': '<path d="M6 8a6 6 0 1 1 12 0c0 3-2 4-3 5.5S14 17 12 19s-4 1-4-1"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0"/>',
+  'own': '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+};
+const keyFor = text => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return 'rc-tries2-' + h; };
+function bestFor(p) { const t = store.get(keyFor(p.text), []); return t.length ? Math.max(...t.map(x => x.total)) : null; }
+function renderLessons() {
+  const sel = +$('passageSelect').value;
+  $('lessons').innerHTML = PASSAGES.map((p, i) => {
+    const b = p.id === 'own' ? null : bestFor(p), words = p.id === 'own' ? 'Your text' : `${p.text.split(/\s+/).length} words`;
+    return `<button type="button" class="lesson" data-i="${i}" aria-pressed="${i === sel}">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${LESSON_ICONS[p.id] || ''}</svg></span>
+      <span class="nm">${esc(p.title)}</span>
+      <span class="sub">${words} ${p.id === 'own' ? '' : b !== null ? `<span class="pill done">Done \u00b7 best ${b}/10</span>` : '<span class="pill new">New</span>'}</span>
+    </button>`;
+  }).join('');
+  const preset = PASSAGES.filter(p => p.id !== 'own'), done = preset.filter(p => bestFor(p) !== null).length;
+  $('progFill').style.width = `${(done / preset.length) * 100}%`;
+  $('progText').textContent = `${done} of ${preset.length} done`;
+  const row = $('lessons'), on = row.querySelector('[aria-pressed="true"]');
+  if (on && (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth)) row.scrollLeft = on.offsetLeft - 8;
+}
+$('lessons').addEventListener('click', e => {
+  const b = e.target.closest('.lesson'); if (!b || rec || busy) return;
+  $('passageSelect').value = b.dataset.i; $('passageSelect').onchange();
+});
+function setStep(step) {
+  const order = ['prep', 'read', 'feedback'], cur = order.indexOf(step);
+  document.querySelectorAll('#steps li').forEach(li => {
+    const i = order.indexOf(li.dataset.step);
+    li.className = i === cur ? 'on' : i < cur ? 'past' : '';
+    li.setAttribute('aria-current', i === cur ? 'step' : 'false');
+  });
+}
+function ring(total, max) {
+  const r = 40, c = 2 * Math.PI * r;
+  return `<svg class="ring" viewBox="0 0 96 96" role="img" aria-label="${total} out of ${max}">
+    <circle class="bg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9"/>
+    <circle class="fg" cx="48" cy="48" r="${r}" fill="none" stroke-width="9" stroke-dasharray="${(c * total / max).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 48 48)"/>
+    <text x="48" y="52" text-anchor="middle">${total}<tspan class="of" dx="1">/${max}</tspan></text></svg>`;
+}
+let clockId = 0;
+const fmtClock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function renderPassage() {
   $('pageTitle').textContent = passage().title;
@@ -748,6 +849,9 @@ function renderPassage() {
   $('passage').classList.remove('plain');
   liveSpans = [...$('passage').querySelectorAll('.w')].filter(s => RS.norm(s.textContent));
   clearResult();
+  renderLessons();
+  setStep('prep');
+  if (!rec) $('clock').textContent = '0:00';
 }
 
 // ---------- live follow-along (practice only) ----------
@@ -815,13 +919,15 @@ function startLive({ stream, buffer, playUrl, expectText }) {
   let mr = null; const chunks = [];
   if (stream) { mr = new MediaRecorder(stream); mr.ondataavailable = e => chunks.push(e.data); mr.start(); }
   rec = { stream, src, node, analyser, mr, chunks, sessions, playUrl, expectText, startedAt: performance.now() };
+  setStep('read');
+  clearInterval(clockId); clockId = setInterval(() => { if (rec) $('clock').textContent = fmtClock((performance.now() - rec.startedAt) / 1000); }, 250);
   if (!stream) src.start();
   const hint = appMode === 'test' ? 'Test: read the whole passage, then tap stop' : 'Listening… tap to stop when you finish';
   setMic('recording', stream ? hint : 'Playing the sample… tap to stop');
 }
 
 async function stopMic() {
-  const r = rec; if (!r) return; rec = null;
+  const r = rec; if (!r) return; rec = null; clearInterval(clockId);
   cancelAnimationFrame(meterRaf); $('mic').style.setProperty('--level', 0);
   const elapsed = (performance.now() - r.startedAt) / 1000;
   if (!r.stream) { r.src.onended = null; try { r.src.stop(); } catch (e) {} }
@@ -841,7 +947,7 @@ async function stopMic() {
 // ---------- recorded file ----------
 async function runAudio(arrayBuffer, playUrl, expectText) {
   if (!RS.tokenize(passageText()).length || busy) return;
-  busy = true; current = null; renderPassage(); setMic('busy', 'Checking the recording…');
+  busy = true; current = null; renderPassage(); setStep('read'); setMic('busy', 'Checking the recording…');
   audioCtx = audioCtx || new AudioContext();
   const audio = await audioCtx.decodeAudioData(arrayBuffer);
   const data = audio.getChannelData(0), sr = audio.sampleRate;
@@ -887,6 +993,8 @@ function showCurrent() {
   $('playback').src = c.playUrl || '';
   $('after').hidden = !c.playUrl;
   $('note').textContent = c.expectText || ''; $('note').hidden = !c.expectText;
+  $('scoreCard').hidden = false; $('actionbar').hidden = false; $('ring').innerHTML = '';
+  setStep('feedback');
 
   if (a.tooNoisy) {
     $('verdict').textContent = 'It was too noisy to check your reading.';
@@ -900,7 +1008,8 @@ function showCurrent() {
     return;
   }
   const m = marksOf(c);
-  $('grade').innerHTML = `<span>${m.total}<small>/10</small></span>`; $('grade').hidden = false;
+  $('ring').innerHTML = ring(m.total, 10);
+  $('actionNote').textContent = `${a.message.headline.replace(/!$/, '')} \u00b7 ${m.total}/10`;
   $('verdict').textContent = c.review ? 'Checked by your teacher' : a.message.headline;
   $('lead').textContent = (c.review ? (c.review.note || `Score: ${m.total} out of 10.`) : practice ? a.message.lead : 'Your reading has been scored. Your teacher can check it.') +
     (a.quality === 'noisy' && !c.review ? ' It was a bit noisy, so small words and word endings were not marked.' : '');
@@ -911,6 +1020,7 @@ function showCurrent() {
   $('key').hidden = !practice || !a.mistakes.length;
   renderAnalysis(c);
   renderQuiz(c);
+  renderLessons();
   fitNotes();
 }
 
@@ -1060,7 +1170,7 @@ function renderSentences(a) {
 }
 
 // ---------- tries on this passage ----------
-function triesKey() { let h = 0; for (const ch of passageText()) h = (h * 31 + ch.charCodeAt(0)) | 0; return 'rc-tries2-' + h; }
+function triesKey() { return keyFor(passageText()); }
 const loadTries = () => store.get(triesKey(), []);
 function saveTry(c) {
   const t = loadTries();
@@ -1270,6 +1380,13 @@ $('passageText').oninput = () => { current = null; renderPassage(); };
 $('passageSelect').onchange();
 
 $('mic').onclick = () => (rec ? stopMic() : startMic());
+$('retry').onclick = () => { current = null; renderPassage(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+$('nextPassage').onclick = () => {
+  const presets = PASSAGES.map((p, i) => i).filter(i => PASSAGES[i].id !== 'own');
+  const cur = presets.indexOf(+$('passageSelect').value);
+  $('passageSelect').value = presets[(cur + 1) % presets.length]; $('passageSelect').onchange();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 $('modePractice').onclick = () => setAppMode('practice');
 $('modeTest').onclick = () => setAppMode('test');
 setAppMode(appMode === 'test' ? 'test' : 'practice');

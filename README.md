@@ -15,6 +15,7 @@ Written and spoken feedback both use the same six parts: level and score (out of
 | Folder | What it is |
 |---|---|
 | `public/` | **The website.** Vercel serves this folder as the site root (see `vercel.json`). |
+| `public/css/` | `base.css` is the shared course look for all three pages (header, tabs, lesson cards, steps, paper surfaces, score ring, buttons); `course.css` adds the Write and Speak parts |
 | `public/js/` | `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page) |
 | `api/evaluate.js` | Vercel server function that asks the AI for feedback. Only the tasks in `tasks.js` can be marked |
 | `tests/` | Unit tests for all the scoring rules and the server function |
