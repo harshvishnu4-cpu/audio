@@ -173,12 +173,14 @@
   }
   function readingResult(text, raw) {
     const a = window.ReadingScore.analyse({ text, primary: raw.passes[0], open: raw.passes[1], silences: raw.silences, snrDb: raw.snrDb });
-    const words = a.words.map(w => ({ text: w.raw, status: w.status, heard: w.heard || null }));
+    const words = a.words.map(w => ({ text: w.raw, status: w.status, heard: w.heard || null, rule: w.rule, outcome: w.outcome, cost: w.cost }));
     return {
       score: a.rubric.total, max: 10, marks: { accuracy: a.rubric.accuracy.marks, pace: a.rubric.pace.marks, phrasing: a.rubric.phrasing.marks },
       accuracy: a.accuracy, wcpm: a.wcpm, headline: a.message.headline, tip: a.message.lead,
       words, missed: words.filter(w => w.status === 'skip').map(w => w.text), changed: words.filter(w => w.status === 'change').map(w => ({ word: w.text, heard: w.heard })),
       added: a.extras.filter(x => x.kind === 'added').map(x => x.word),
+      // by the read-aloud scoring rules: errors, minor errors (weigh less), unclear words that count, and notes that never lower the score
+      counts: { errors: a.counts.errors, minor: a.counts.minor, unclear: a.counts.unclearCounted, errorCost: a.counts.errorCost }, notes: a.notes,
       tooNoisy: a.tooNoisy, heardTooLittle: a.heardTooLittle, recording: raw.recording, analysis: a,
     };
   }

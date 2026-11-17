@@ -11,6 +11,17 @@
   Each heard word is { word, conf (0..1), start, end } in seconds.
 
   Every threshold is in CONFIG so it can be tuned against teacher reviews.
+
+  Scoring follows the "Read-Aloud Scoring Rules" doc. Every mistake has one of five outcomes:
+    error    counts as one error          (skips, added words, swapped words, word order, endings, tense, numbers…)
+    minor    counts, but weighs less      (small-word swaps, a word that means the same, saying punctuation aloud)
+    unclear  counts only when hard to understand (a word neither pass could make out, on a clear recording)
+    note     recorded for feedback only   (accent tips, long hesitations, repeats, losing the place, fillers)
+    ignored  not an error                 (self-corrections, reading the title or instructions first, "don't" for
+                                           "do not", names said differently, background noise)
+  Each passage word and extra word carries { rule, outcome, cost }; accuracy uses the costs.
+  Not detectable from speech recognition (left to a teacher's review): silent letters said aloud, wrong stress,
+  the wrong reading of a word with two pronunciations, a flat voice, and dropped syllables the engine hears as the word.
 */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -35,6 +46,14 @@
     // classroom noise (clean ≥ 33, 10 dB noise ≈ 15–22, 0 dB noise ≈ 8–13): re-tune on real recordings.
     noisySnrDb: 24,         // below this: noisy. Small words and dropped endings that only one pass heard aren't marked
     tooNoisySnrDb: 13.5,    // below this: too noisy to score at all
+    // Rules from the scoring doc. Values marked "to agree" are open points for the language expert.
+    rules: {
+      minorWeight: 0.5,        // to agree: how much a minor error weighs compared with an error
+      addedWeight: 1,          // to agree: whether added words count, and how much (doc table: one error)
+      unclearCounts: true,     // to agree how "hard to understand" is decided; here: neither pass could make out the word
+      sameKindRepeats: 'each', // to agree: 'each' counts every repeat of the same mistake (dropped endings…), 'once' counts the kind once
+      namesTaught: false,      // true when the passage teaches the names, so saying a name differently counts
+    },
     // Rubric bands. PLACEHOLDERS until replaced with the course's own rubric.
     rubric: {
       accuracy: [[97, 4], [90, 3], [80, 2], [0, 1]], // [minimum accuracy %, marks out of 4]
@@ -108,15 +127,92 @@
     return out.filter(v => v.form.length >= 2 && v.form !== n);
   }
   const variantPattern = (expected, heard) => (variants(expected).find(v => v.form === heard) || {}).pattern || null;
+  // Adding an ending ("understands" for "understand", "freshest" for "fresh") is an error too.
+  const ADDED_ENDINGS = ['s', 'es', 'ed', 'd', 'ing', 'er', 'est', 'ly'];
+  function addedEnding(expected, heard) {
+    if (!expected || !heard || heard.length <= expected.length || expected.length < 3) return null;
+    if (heard.startsWith(expected) && ADDED_ENDINGS.includes(heard.slice(expected.length))) return heard.slice(expected.length);
+    if (expected.endsWith('e') && heard.startsWith(expected.slice(0, -1)) && ['ed', 'ing', 'er', 'est'].includes(heard.slice(expected.length - 1))) return heard.slice(expected.length - 1);
+    return null;
+  }
+  // forms with an added ending, so the passage pass can hear them (content words only, to keep the grammar small)
+  const addedForms = n => (n.length < 4 || SMALL_WORDS.has(n) || /[\d']/.test(n) || /(s|ed|ing|ly|n)$/.test(n)) ? [] : [/(x|z|ch|sh)$/.test(n) ? n + 'es' : n + 's', n.endsWith('e') ? n + 'd' : n + 'ed'];
+
+  // ---------- rules: numbers and short forms, contractions, same meaning, fillers, punctuation ----------
+  const ONES = 'zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen'.split(' ');
+  const TENS = ',,twenty,thirty,forty,fifty,sixty,seventy,eighty,ninety'.split(',');
+  function numberWords(n) { // 0–9999 as words
+    if (n < 20) return [ONES[n]];
+    if (n < 100) return n % 10 ? [TENS[Math.floor(n / 10)], ONES[n % 10]] : [TENS[n / 10]];
+    if (n < 1000) return [ONES[Math.floor(n / 100)], 'hundred', ...(n % 100 ? ['and', ...numberWords(n % 100)] : [])];
+    return [...numberWords(Math.floor(n / 1000)), 'thousand', ...(n % 1000 ? (n % 1000 < 100 ? ['and', ...numberWords(n % 1000)] : numberWords(n % 1000)) : [])];
+  }
+  const ORDINAL = { one: 'first', two: 'second', three: 'third', five: 'fifth', eight: 'eighth', nine: 'ninth', twelve: 'twelfth' };
+  const ordinalWords = ws => { const last = ws[ws.length - 1]; return [...ws.slice(0, -1), ORDINAL[last] || (last.endsWith('y') ? last.slice(0, -1) + 'ieth' : last + 'th')]; };
+  const SHORT_FORMS = { dr: [['doctor']], mr: [['mister']], mrs: [['missus'], ['misses']], ms: [['miss'], ['mizz']], st: [['street'], ['saint']], etc: [['et', 'cetera']], vs: [['versus']] };
+  // How a passage word is said: a list of possible word sequences, the first one used for lining up. null for ordinary words.
+  function spokenForms(n) {
+    if (SHORT_FORMS[n]) return SHORT_FORMS[n];
+    let m = n.match(/^(\d{1,4})(st|nd|rd|th)?$/);
+    if (!m) return null;
+    const v = +m[1], forms = [];
+    if (m[2]) return [ordinalWords(numberWords(v))];
+    forms.push(numberWords(v));
+    if (v >= 100 && v < 1000 && v % 100) forms.push(numberWords(v).filter(w => w !== 'and'));
+    if (v >= 1100 && v <= 2099 && v % 100) { // years: "nineteen ninety eight", "twenty twenty four"
+      const hi = Math.floor(v / 100), lo = v % 100;
+      forms.unshift([...numberWords(hi), ...(lo < 10 ? ['oh'] : []), ...numberWords(lo)]);
+    }
+    if (v >= 2000 && v < 2100) forms.push(numberWords(v).filter(w => w !== 'and'));
+    return forms;
+  }
+  const CONTRACTIONS = { "don't": 'do not', "doesn't": 'does not', "didn't": 'did not', "can't": 'can not', cannot: 'can not', "won't": 'will not',
+    "isn't": 'is not', "aren't": 'are not', "wasn't": 'was not', "weren't": 'were not', "haven't": 'have not', "hasn't": 'has not', "hadn't": 'had not',
+    "couldn't": 'could not', "shouldn't": 'should not', "wouldn't": 'would not', "i'm": 'i am', "you're": 'you are', "we're": 'we are', "they're": 'they are',
+    "it's": 'it is', "that's": 'that is', "there's": 'there is', "what's": 'what is', "let's": 'let us', "i'll": 'i will', "you'll": 'you will',
+    "we'll": 'we will', "they'll": 'they will', "he'll": 'he will', "she'll": 'she will', "i've": 'i have', "we've": 'we have', "they've": 'they have',
+    "you've": 'you have', "i'd": 'i would', "he's": 'he is', "she's": 'she is' };
+  // "don't" for "do not" (and the other way round) is not an error: make the heard words match the passage's form.
+  function matchContractions(refN, hyp) {
+    const ref = ' ' + refN.join(' ') + ' ', out = [];
+    for (let k = 0; k < hyp.length; k++) {
+      const h = hyp[k], full = CONTRACTIONS[h.word];
+      if (full && !ref.includes(' ' + h.word + ' ') && ref.includes(' ' + full + ' ')) {
+        const parts = full.split(' '), d = (h.end - h.start) / parts.length;
+        parts.forEach((p, i) => out.push({ ...h, word: p, start: +(h.start + i * d).toFixed(3), end: +(h.start + (i + 1) * d).toFixed(3), contraction: h.word }));
+        continue;
+      }
+      const two = k + 1 < hyp.length ? h.word + ' ' + hyp[k + 1].word : '';
+      const short = two && Object.keys(CONTRACTIONS).find(c => CONTRACTIONS[c] === two && ref.includes(' ' + c + ' ') && !ref.includes(' ' + two + ' '));
+      if (short) { out.push({ ...h, word: short, end: hyp[k + 1].end, conf: Math.min(h.conf, hyp[k + 1].conf), contraction: two }); k++; continue; }
+      out.push(h);
+    }
+    return out;
+  }
+  // Words that mean the same: swapping one for the other is a minor error.
+  const SAME_MEANING = [['kids', 'children'], ['kid', 'child'], ['big', 'large'], ['small', 'little'], ['happy', 'glad'], ['start', 'begin'], ['started', 'began'],
+    ['end', 'finish'], ['shop', 'store'], ['mother', 'mom', 'mum', 'mummy'], ['father', 'dad', 'daddy', 'papa'], ['grandmother', 'grandma', 'granny', 'nani', 'dadi'],
+    ['grandfather', 'grandpa', 'nana', 'dada'], ['fast', 'quick'], ['quickly', 'fast'], ['close', 'shut'], ['look', 'see'], ['looks', 'sees'], ['said', 'told'],
+    ['buy', 'get'], ['road', 'street'], ['home', 'house'], ['talk', 'speak'], ['nice', 'good'], ['fine', 'okay', 'ok'], ['near', 'close'], ['ill', 'sick'],
+    ['answer', 'reply'], ['ask', 'question'], ['help', 'assist'], ['many', 'lots'], ['afraid', 'scared'], ['angry', 'mad'], ['gift', 'present'], ['car', 'vehicle']];
+  const sameMeaning = (a, b) => a !== b && SAME_MEANING.some(g => g.includes(a) && g.includes(b));
+  const FILLERS = new Set(['um', 'umm', 'uh', 'uhh', 'uhm', 'er', 'erm', 'ah', 'hmm', 'mm', 'huh', 'eh']);
+  const PUNCT_WORDS = new Set(['comma', 'period', 'dot', 'full', 'stop', 'question', 'mark', 'exclamation', 'colon', 'semicolon']);
+  const CORRECTION_MARKERS = new Set(['no', 'sorry', 'mean', 'wait']);
+  const IRREGULAR_PAST = { go: 'went', goes: 'went', come: 'came', see: 'saw', eat: 'ate', buy: 'bought', take: 'took', make: 'made', get: 'got', give: 'gave',
+    find: 'found', think: 'thought', tell: 'told', say: 'said', run: 'ran', sit: 'sat', stand: 'stood', write: 'wrote', speak: 'spoke', meet: 'met', is: 'was', are: 'were', have: 'had', has: 'had' };
+  const tenseChange = (a, b) => IRREGULAR_PAST[a] === b || IRREGULAR_PAST[b] === a || (a.endsWith('ed') && variantPattern(a, b) === 'ed') || (b.endsWith('ed') && b.slice(0, -2) === a);
 
   // Grammar for the primary pass. sentences: whole sentences + single words + variants (best in tests).
   function grammarFor(text, mode) {
     if (mode === 'open') return null;
     const tokens = tokenize(text);
-    const words = tokens.map(t => t.n);
-    const extra = tokens.flatMap(t => variants(t.n).map(v => v.form));
+    const say = t => { const f = spokenForms(t.n); return f ? f[0] : [t.n]; };
+    const words = tokens.flatMap(say);
+    const extra = tokens.flatMap(t => [...variants(t.n).map(v => v.form), ...addedForms(t.n), ...(spokenForms(t.n) || []).slice(1).flat(),
+      ...(CONTRACTIONS[t.n] ? CONTRACTIONS[t.n].split(' ') : [])]);
     if (mode === 'words') return [...new Set([...words, ...extra])];
-    const sentences = String(text).split(/[.!?]+/).map(s => tokenize(s).map(t => t.n).join(' ')).filter(Boolean);
+    const sentences = String(text).split(/[.!?]+/).map(s => tokenize(s).flatMap(say).join(' ')).filter(Boolean);
     return [...new Set([...sentences, ...words, ...extra])];
   }
 
@@ -142,6 +238,85 @@
     return ops.reverse();
   }
 
+  // A name inside a sentence (capitalised, not the first word): saying it differently isn't an error.
+  function isName(tokens, i) {
+    const t = tokens[i], first = clean(t.raw).replace(/^["'“‘(]+/, '')[0] || '';
+    return i > 0 && !tokens[i - 1].endsSentence && /[A-Z]/.test(first) && t.n !== 'i' && !t.forms && !/\d/.test(t.n);
+  }
+  // Lining up runs on spoken units; fold the units of one passage word ("twenty" + "one" for "21") back into one result.
+  function foldUnits(ops, units, tokens, hyp) {
+    const parentOf = op => (op.r !== undefined ? units[op.r].parent : null);
+    const out = [];
+    for (let k = 0; k < ops.length; k++) {
+      const op = ops[k], p = parentOf(op);
+      if (p === null) { out.push(op); continue; }
+      if (!tokens[p].forms) { out.push({ ...op, r: p }); continue; }
+      let last = k; for (let j = k + 1; j < ops.length; j++) { if (parentOf(ops[j]) === p) last = j; else if (parentOf(ops[j]) !== null) break; }
+      const group = ops.slice(k, last + 1), hs = group.filter(o => o.h !== undefined).map(o => hyp[o.h]);
+      k = last;
+      if (!hs.length) { out.push({ t: 'del', r: p }); continue; }
+      const said = hs.map(h => h.word).join(' ');
+      hyp.push({ word: said, conf: Math.min(...hs.map(h => h.conf)), start: hs[0].start, end: hs[hs.length - 1].end, joined: true });
+      out.push({ t: tokens[p].forms.some(f => f.join(' ') === said) ? 'ok' : 'sub', r: p, h: hyp.length - 1 });
+    }
+    return out;
+  }
+  // The scoring rules (see the top of this file): rule, outcome and cost for every passage word and extra word.
+  function applyRules(words, extras, R, quality, hasOpen) {
+    const lastSaid = words.reduce((m, w) => (w.start !== null ? Math.max(m, w.i) : m), -1);
+    const set = (m, rule, outcome, cost) => Object.assign(m, { rule, outcome, cost });
+    for (const w of words) {
+      set(w, null, 'correct', 0);
+      if (w.status === 'ok') { if (w.selfCorrected) set(w, 'self-correction', 'ignored', 0); }
+      else if (w.status === 'skip') set(w, w.i > lastSaid ? 'stopped-early' : 'skip', 'error', 1);
+      else if (w.status === 'tip') set(w, w.pattern ? 'ending-unclear' : 'accent', 'note', 0);
+      else if (w.status === 'unclear') {
+        // counts only when the word was hard to understand: a clear recording, both passes, and neither could make it out
+        // (had the open pass clearly heard another word there, the word would already be a change)
+        const counts = R.unclearCounts && hasOpen && quality === 'good' && !w.noisy && w.clarity === 'unclear';
+        set(w, 'unclear', counts ? 'unclear' : 'ignored', counts ? 1 : 0);
+      } else if (w.status === 'change') {
+        const h = w.heard || '';
+        if (w.name && !R.namesTaught) { w.status = 'tip'; w.soundedLike = h; set(w, 'name', 'ignored', 0); }
+        else if (w.forms) set(w, 'number', 'error', 1);
+        else if (w.pattern) set(w, 'dropped-ending', 'error', 1);
+        else if (addedEnding(w.n, h)) set(w, 'added-ending', 'error', 1);
+        else if (w.small && SMALL_WORDS.has(h)) set(w, 'small-word', 'minor', R.minorWeight);
+        else if (sameMeaning(w.n, h)) set(w, 'same-meaning', 'minor', R.minorWeight);
+        else if (tenseChange(w.n, h)) set(w, 'tense', 'error', 1);
+        else if (w.alike) set(w, 'similar-word', 'error', 1);
+        else if (h.length >= 2 && h[0] === w.n[0] && h !== w.n) set(w, 'first-letter', 'error', 1);
+        else set(w, 'changed', 'error', 1);
+      }
+    }
+    // changing the word order ("was it" for "it was") is one error, not two
+    for (let i = 0; i + 1 < words.length; i++) {
+      const a = words[i], b = words[i + 1];
+      if (a.status === 'change' && b.status === 'change' && a.heard === b.n && b.heard === a.n) { set(a, 'order', 'error', 1); set(b, 'order', 'error', 0); }
+    }
+    for (const x of extras) {
+      if (x.kind !== 'added') continue;
+      const moved = words.find(w => w.status === 'skip' && w.n === x.word && Math.min(Math.abs(w.i - x.after), Math.abs(w.i - (x.before >= 0 ? x.before : x.after + 1))) <= 1);
+      if (moved) { x.kind = 'moved'; set(moved, 'order', 'error', 1); }
+    }
+    for (const x of extras) {
+      if (x.kind === 'added') x.rule === 'punctuation' ? set(x, 'punctuation', 'minor', R.minorWeight) : set(x, 'added', 'error', R.addedWeight);
+      else if (x.kind === 'repeat') set(x, x.lostPlace ? 'lost-place' : 'repeat', 'note', 0);
+      else if (x.kind === 'filler') set(x, 'filler', 'note', 0);
+      else if (x.kind === 'selfcorrect') set(x, 'self-correction', 'ignored', 0);
+      else if (x.kind === 'preamble') set(x, 'title-or-instructions', 'ignored', 0);
+      else if (x.kind === 'noise') set(x, 'noise', 'ignored', 0);
+      else set(x, 'part-of-mistake', 'ignored', 0); // 'part' ("stop" in "full stop"), 'moved' (word order)
+    }
+    // to agree: count a repeated kind of mistake once (e.g. dropped endings), or every time (default)
+    if (R.sameKindRepeats === 'once') {
+      const seen = new Set();
+      for (const m of [...words, ...extras].filter(m => m.cost > 0 && !['skip', 'stopped-early', 'added'].includes(m.rule)).sort((a, b) => (a.start ?? 0) - (b.start ?? 0))) {
+        if (seen.has(m.rule)) m.cost = 0; else seen.add(m.rule);
+      }
+    }
+  }
+
   // ---------- main analysis ----------
   // silences: optional [{ from, to }] quiet stretches measured from the audio itself. The engine's word
   // times run into each other (silence is folded into the words), so real pauses come from the audio.
@@ -149,9 +324,14 @@
   function analyse({ text, primary, open = null, silences = null, snrDb = null, config = {} }) {
     const C = { ...CONFIG, ...config, rubric: { ...CONFIG.rubric, ...(config.rubric || {}) } };
     const tokens = tokenize(text);
+    tokens.forEach(t => { t.forms = spokenForms(t.n); t.name = isName(tokens, t.i); });
+    // A passage word can be said as several words ("21" → "twenty one", "Dr" → "doctor"): line up on spoken units
+    const units = tokens.flatMap(t => (t.forms ? t.forms[0] : [t.n]).map(n => ({ n, parent: t.i })));
     const toHyp = ws => (ws || []).map(w => ({ word: w.word === '[unk]' ? '[unk]' : norm(w.word), conf: +w.conf, start: +w.start, end: +w.end })).filter(w => w.word);
-    const hyp = toHyp(primary), openHyp = open ? toHyp(open) : null;
-    const ops = align(tokens.map(t => t.n), hyp);
+    const refUnits = units.map(u => u.n);
+    const hyp = matchContractions(refUnits, toHyp(primary)), openHyp = open ? matchContractions(refUnits, toHyp(open)) : null;
+    const heardCount = hyp.length;
+    const ops = foldUnits(align(refUnits, hyp), units, tokens, hyp);
 
     // 1. per passage word
     const words = tokens.map(t => ({ ...t, status: 'skip', heard: null, conf: null, start: null, end: null, pattern: null, clarity: null }));
@@ -172,16 +352,8 @@
       }
     });
 
-    // 2. extra words: repeats, self-corrections, real additions
-    for (const x of extras) {
-      const nextW = x.before >= 0 ? words[x.before] : null;
-      const nearby = windowWords(words, x.after, x.before, 3);
-      if (x.word === '[unk]') x.kind = 'noise';
-      else if (nextW && nextW.status === 'ok' && (isFalseStart(x.word, nextW.n) || soundsAlike(x.word, nextW.n) || variantPattern(nextW.n, x.word))) {
-        x.kind = 'selfcorrect'; nextW.selfCorrected = x.word;
-      } else if (nearby.includes(x.word)) x.kind = 'repeat';
-      else { x.kind = 'added'; x.small = SMALL_WORDS.has(x.word); }
-    }
+    // 2. extra words from the passage pass: noise now, the rest are sorted once the open pass has added its own (step 3c)
+    for (const x of extras) if (x.word === '[unk]') x.kind = 'noise';
 
     // 3. open pass: how each word actually sounded
     if (openHyp) {
@@ -202,7 +374,8 @@
           } else if (alike) {
             w.clarity = 'close';
             // the reader said the right word with a different sound: a pronunciation tip, not a mistake
-            if (w.status === 'ok' || w.status === 'unclear' || (w.status === 'change' && w.alike)) { w.status = 'tip'; w.soundedLike = alike; }
+            // …but when both passes heard the same different word ("horse" for "house"), it is a swap: an error
+            if (w.status === 'ok' || w.status === 'unclear' || (w.status === 'change' && w.alike && !heardOpen.includes(w.heard))) { w.status = 'tip'; w.soundedLike = alike; }
           } else {
             w.clarity = w.status === 'ok' && w.conf >= C.clearConf && !heardOpen.length ? 'clear' : 'unclear';
             if (heardOpen.length) w.soundedLike = heardOpen.join(' ');
@@ -238,6 +411,35 @@
       for (const w of words) if (w.start !== null) w.clarity = w.status === 'unclear' ? 'unclear' : w.conf >= C.clearConf ? 'clear' : 'close';
     }
 
+    // 3c. extra words, by the rules: fillers, the title or instructions read first, punctuation said aloud,
+    // self-corrections ("foot, no, fruit"), repeats and losing the place, and real additions
+    const firstStart = Math.min(...words.filter(w => w.start !== null).map(w => w.start), Infinity);
+    extras.sort((a, b) => a.start - b.start);
+    extras.forEach((x, k) => {
+      if (x.kind === 'noise') return;
+      const prev = extras[k - 1], nextW = x.before >= 0 ? words[x.before] : null, afterW = x.after >= 0 ? words[x.after] : null;
+      x.small = SMALL_WORDS.has(x.word);
+      if (FILLERS.has(x.word)) x.kind = 'filler';
+      else if (x.after === -1 && x.start < firstStart) x.kind = 'preamble';
+      else if (PUNCT_WORDS.has(x.word) && ((afterW && (afterW.endsSentence || afterW.endsClause)) || (prev && prev.rule === 'punctuation' && prev.end > x.start - 0.6))) {
+        if (prev && prev.rule === 'punctuation' && prev.end > x.start - 0.6 && ['stop', 'mark'].includes(x.word)) x.kind = 'part';
+        else { x.kind = 'added'; x.rule = 'punctuation'; }
+      } else if (nextW && nextW.status === 'ok' && (isFalseStart(x.word, nextW.n) || soundsAlike(x.word, nextW.n) || variantPattern(nextW.n, x.word))) {
+        x.kind = 'selfcorrect'; nextW.selfCorrected = x.word;
+      } else if (CORRECTION_MARKERS.has(x.word) && nextW && nextW.status === 'ok' && prev && prev.before === x.before) {
+        x.kind = 'selfcorrect'; nextW.selfCorrected = prev.word;
+        for (let j = k - 1; j >= 0 && extras[j].before === x.before && extras[j].kind !== 'noise'; j--) extras[j].kind = 'selfcorrect';
+      } else if (windowWords(words, Math.max(-1, x.after - 14), x.before, 1).includes(x.word) || (x.after >= 0 && words.slice(Math.max(0, x.after - 14), x.after + 2).some(w => w.n === x.word))) {
+        x.kind = 'repeat';
+      } else x.kind = 'added';
+    });
+    // reading a line again: a run of four or more repeated words is losing the place (a note, not a mistake)
+    for (let k = 0; k < extras.length;) {
+      let j = k; while (j < extras.length && extras[j].kind === 'repeat') j++;
+      if (j - k >= 4) for (let m = k; m < j; m++) extras[m].lostPlace = true;
+      k = Math.max(j, k + 1);
+    }
+
     // 3b. noisy recording: don't accuse the reader of what noise most often fakes
     const quality = snrDb === null ? 'unknown' : snrDb < C.tooNoisySnrDb ? 'too-noisy' : snrDb < C.noisySnrDb ? 'noisy' : 'good';
     if (quality === 'noisy') {
@@ -262,6 +464,10 @@
       else if (w.status === 'tip') { w.meaning = 'same'; w.weight = 0.5; }
     }
     for (const x of extras) if (x.kind === 'added') { x.meaning = x.small ? 'same' : 'changes'; x.weight = x.small ? 1 : 4; }
+
+    // 4b. the scoring rules: which rule each mistake falls under, its outcome, and what it costs
+    const R = { ...CONFIG.rules, ...(config.rules || {}) };
+    applyRules(words, extras, R, quality, !!openHyp);
 
     // 5. timing, pauses and phrasing (in the order things were said)
     const spoken = words.filter(w => w.start !== null).sort((a, b) => a.start - b.start);
@@ -307,15 +513,21 @@
 
     // 6. counts, accuracy, speed
     const count = s => words.filter(w => w.status === s).length;
+    const all = [...words, ...extras];
+    const costOf = list => +list.reduce((t, m) => t + (m.cost || 0), 0).toFixed(2);
     const counts = {
       total: words.length, correct: count('ok') + count('tip'), tips: count('tip'),
       skipped: count('skip'), changed: count('change'), unclear: count('unclear'),
       added: extras.filter(x => x.kind === 'added').length, repeats: extras.filter(x => x.kind === 'repeat').length,
       selfCorrected: words.filter(w => w.selfCorrected).length,
+      // by the rules
+      errors: all.filter(m => m.outcome === 'error' && m.cost > 0).length, minor: all.filter(m => m.outcome === 'minor').length,
+      unclearCounted: all.filter(m => m.outcome === 'unclear').length, notes: all.filter(m => m.outcome === 'note').length,
+      fillers: extras.filter(x => x.kind === 'filler').length, errorCost: costOf(all),
     };
-    const checked = counts.total - counts.unclear;
-    const errors = counts.skipped + counts.changed + counts.added;
-    const accuracy = checked ? Math.max(0, Math.round(100 * (checked - errors) / checked)) : 0;
+    // unclear words that don't count are left out of the check; everything else is weighed by its cost
+    const checked = counts.total - words.filter(w => w.status === 'unclear' && !w.cost).length;
+    const accuracy = checked ? Math.max(0, Math.round(100 * (checked - counts.errorCost) / checked)) : 0;
     const wcpm = readingSec > 0.5 ? Math.round(counts.correct / (readingSec / 60)) : 0;
     const clearWords = spoken.filter(w => w.clarity === 'clear').length;
     const clarity = spoken.length ? Math.round(100 * clearWords / spoken.length) : 0;
@@ -328,9 +540,8 @@
       s.words.push(w);
     }
     for (const s of sentences) {
-      const chk = s.words.filter(w => w.status !== 'unclear');
-      const errs = s.words.filter(w => w.status === 'skip' || w.status === 'change').length +
-        extras.filter(x => x.kind === 'added' && x.before >= 0 && words[x.before].sentence === s.i).length;
+      const chk = s.words.filter(w => w.status !== 'unclear' || w.cost);
+      const errs = costOf(s.words) + costOf(extras.filter(x => x.before >= 0 && words[x.before].sentence === s.i));
       s.accuracy = chk.length ? Math.max(0, Math.round(100 * (chk.length - errs) / chk.length)) : 100;
       s.skipped = s.words.filter(w => w.status === 'skip').length;
       s.changed = s.words.filter(w => w.status === 'change').length;
@@ -341,10 +552,15 @@
     const mistakes = [
       ...words.filter(w => ['skip', 'change', 'unclear', 'tip'].includes(w.status)).map(w => ({
         kind: w.status, at: w.i, word: clean(w.raw), heard: w.status === 'tip' ? w.soundedLike : w.heard, pattern: w.pattern,
-        meaning: w.meaning, weight: w.weight, start: w.start, end: w.end })),
+        meaning: w.meaning, weight: w.weight, start: w.start, end: w.end, rule: w.rule, outcome: w.outcome, cost: w.cost, say: w.forms ? w.forms[0].join(' ') : null })),
       ...extras.filter(x => x.kind === 'added').map(x => ({ kind: 'added', at: x.before >= 0 ? x.before - 0.5 : words.length, word: x.word,
-        meaning: x.meaning, weight: x.weight, start: x.start, end: x.end })),
-    ].sort((a, b) => b.weight - a.weight || a.at - b.at);
+        meaning: x.meaning, weight: x.rule === 'punctuation' ? 1 : x.weight, start: x.start, end: x.end, rule: x.rule, outcome: x.outcome, cost: x.cost })),
+    ].sort((a, b) => (b.cost > 0) - (a.cost > 0) || b.weight - a.weight || a.at - b.at);
+    // recorded for feedback, never lowering the score
+    const notes = [
+      ...extras.filter(x => x.outcome === 'note').map(x => ({ rule: x.rule, word: x.word, start: x.start })),
+      ...pauses.stuck.map(p => ({ rule: 'long-hesitation', word: p.before, start: p.from, gap: +p.gap.toFixed(1) })),
+    ].sort((a, b) => a.start - b.start);
 
     // 9. repeated patterns, in one line each with the reader's own examples
     const patterns = [];
@@ -373,7 +589,8 @@
     const paceBand = wcpm < lo ? 'slow' : wcpm > hi ? 'fast' : 'good';
     const paceMarks = paceBand === 'good' ? 3 : (wcpm >= lo * (1 - C.paceNear) && wcpm <= hi * (1 + C.paceNear)) ? 2 : 1;
     const stopShare = pauses.fullStops ? pauses.goodFull / pauses.fullStops : pauses.stops ? pauses.good / pauses.stops : 1;
-    const midStops = pauses.hesitations.length + pauses.stuck.length;
+    // a long hesitation (stuck on a word) is a note only; shorter mid-phrase pauses lower phrasing
+    const midStops = pauses.hesitations.length;
     const phrasingMarks = midStops <= 1 && stopShare >= 0.75 && !wordByWord && pauses.rushed.length <= 1 ? 3
       : midStops <= 3 && stopShare >= 0.5 ? 2 : 1;
     const rubric = {
@@ -394,9 +611,9 @@
 
     return {
       words, extras, counts, accuracy, wcpm, readingSec: +readingSec.toFixed(2), clarity, avgPhrase, wordByWord,
-      pauses: { ...pauses, stopShare: +stopShare.toFixed(2) }, sentences, mistakes, patterns, rubric,
+      pauses: { ...pauses, stopShare: +stopShare.toFixed(2) }, sentences, mistakes, notes, patterns, rubric, rules: R,
       message: { headline, lead, tone: rubric.total >= 9 ? 'praise' : rubric.total >= 7 ? 'good' : 'guide' },
-      heardTooLittle: hyp.length < tokens.length * 0.3,
+      heardTooLittle: heardCount < units.length * 0.3,
       quality, snrDb: snrDb === null ? null : +snrDb.toFixed(1), tooNoisy: quality === 'too-noisy',
     };
   }
@@ -411,6 +628,14 @@
   // Plain-language description of one mistake, used for the message and lists.
   function describe(m) {
     const w = q(m.word);
+    if (m.rule === 'order') return `you changed the word order around ${w}.`;
+    if (m.rule === 'added-ending') return `${w} was read as ${q(m.heard)}. Read the word exactly as it is written.`;
+    if (m.rule === 'same-meaning') return `${w} was read as ${q(m.heard)}. It means the same, but read the word on the page.`;
+    if (m.rule === 'number') return `${w} was read as ${q(m.heard)}. Say it as ${q(m.say || m.word)}.`;
+    if (m.rule === 'punctuation') return `you said ${q(m.word)} aloud. Pause at punctuation instead of reading it.`;
+    if (m.rule === 'tense') return `${w} was read as ${q(m.heard)}, which changes the time of the sentence.`;
+    if (m.rule === 'stopped-early') return `you stopped before the end, at ${w}.`;
+    if (m.rule === 'name') return `${w} was said as ${q(m.heard || '…')}. Names can be said differently, so it isn't counted.`;
     if (m.kind === 'skip') return `you skipped ${w}${m.meaning === 'changes' ? ', which changes the meaning' : ''}.`;
     if (m.kind === 'change' && m.pattern) return `${w} was read as ${q(m.heard)}. Say the ending clearly.`;
     if (m.kind === 'change') return `${w} was read as ${q(m.heard)}${m.meaning === 'changes' ? ', which changes the meaning' : ''}.`;
@@ -445,5 +670,6 @@
   // Recompute rubric total and message after a teacher changes marks.
   function totalOf(marks) { return (marks.accuracy || 0) + (marks.pace || 0) + (marks.phrasing || 0); }
 
-  return { CONFIG, SMALL_WORDS, norm, tokenize, lev, soundex, soundsAlike, variants, variantPattern, grammarFor, align, analyse, describe, livePosition, totalOf, clean };
+  return { CONFIG, SMALL_WORDS, norm, tokenize, lev, soundex, soundsAlike, variants, variantPattern, addedEnding, spokenForms, matchContractions, sameMeaning,
+    grammarFor, align, analyse, describe, livePosition, totalOf, clean };
 });

@@ -101,7 +101,7 @@ const r = await reading.done;                     // stops by itself after the l
 
 | Function | Gives back |
 |---|---|
-| `CommKit.readAloud({ text, onProgress(i, total, word), onLevel(0–1), autoStop = true, maxSeconds = 120, audio })` | a session: `.done` → `{ score, max: 10, marks: { accuracy, pace, phrasing }, accuracy, wcpm, headline, tip, words: [{ text, status, heard }], missed, changed, added, tooNoisy, heardTooLittle, recording }`; `.stop()` |
+| `CommKit.readAloud({ text, onProgress(i, total, word), onLevel(0–1), autoStop = true, maxSeconds = 120, audio })` | a session: `.done` → `{ score, max: 10, marks: { accuracy, pace, phrasing }, accuracy, wcpm, headline, tip, words: [{ text, status, heard, rule, outcome, cost }], missed, changed, added, counts: { errors, minor, unclear, errorCost }, notes, tooNoisy, heardTooLittle, recording }`; `.stop()` |
 | `CommKit.hear(words, { timeout = 8000, onPartial, onLevel, audio })` | `Promise` → `{ word, heard, confidence, timedOut }` |
 | `CommKit.listenFor(words, { onWord(word), onPartial, onLevel, maxSeconds = 600, audio })` | a session: `.stop()`, `.done` |
 | `CommKit.listen({ onPartial(text), onLevel, maxSeconds, audio })` | a session: `.done` → `{ text, words, durationSec, pauses, snrDb, recording }` |
@@ -119,6 +119,20 @@ A **task** is `{ prompt, points, minWords, maxWords, minSec, maxSec, format, pas
 **`audio: 'recording.wav'`** on any listening function checks a recording instead of the microphone, which is useful for testing and for devices without a microphone.
 
 Only one thing listens at a time: starting a new session stops the old one.
+
+## How reading is scored
+
+Reading aloud follows the read-aloud scoring rules. Every mistake has one of five outcomes, shown on each word as `outcome`:
+
+| Outcome | What it means | Examples |
+|---|---|---|
+| `error` | counts as one error | skipped or added word, look-alike swap, word order (one error), dropped or added ending, tense, a number read wrongly, stopping early |
+| `minor` | counts, but weighs less (`rules.minorWeight`, 0.5 for now) | "a" for "the", "kids" for "children", saying "comma" aloud |
+| `unclear` | counts only when the word was hard to understand | a word the engine couldn't make out on a clear recording |
+| `note` | never lowers the score | accent tips, fillers, repeats, re-reading a line, long hesitations |
+| `ignored` | not an error | self-corrections, reading the title first, "don't" for "do not", names said differently, noise |
+
+Open points from the rules (minor weight, whether added words count, counting repeated kinds once) are settings in `CONFIG.rules` in `js/scoring.js`.
 
 ## Offline
 
