@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Writing Practice</title>
-<link rel="stylesheet" href="css/base.css?v=1">
+<link rel="stylesheet" href="css/base.css?v=4">
 <link rel="stylesheet" href="css/course.css?v=3">
 <style>
   /* Write page: the paper is the main thing; the task sits beside it on a tablet, above it on a phone */
@@ -24,21 +24,13 @@
   .meter b { color: var(--text); font-variant-numeric: tabular-nums; }
 </style>
 </head>
-<body>
-<header class="appbar">
-  <div class="appbar-in">
-    <p class="crumb">Communication Skills · Writing</p>
-    <div class="title-row">
-      <h1>Writing practice</h1>
-      <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
-    </div>
-    <nav class="tabs" aria-label="Activity">
-      <a href="index.html">Read aloud</a>
-      <a href="write.html" aria-current="page">Write</a>
-      <a href="speak.html">Speak</a>
-    </nav>
-  </div>
-</header>
+<body data-kind="write">
+<header class="topbar" id="topbar"></header>
+<div class="panel">
+<div class="pagehead">
+  <div><p class="crumb">Communication Skills · Writing</p><h1>Writing practice</h1></div>
+  <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
+</div>
 
 <main>
   <section aria-label="Choose a lesson"><div class="lessons" id="lessons"></div></section>
@@ -67,6 +59,7 @@
 
   <section class="fb" id="feedback" hidden aria-live="polite"></section>
 </main>
+</div>
 
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
@@ -77,6 +70,7 @@
 </div>
 
 <script src="js/tasks.js?v=1"></script>
+<script src="js/course.js?v=1"></script>
 <script src="js/answer-scoring.js?v=2"></script>
 <script src="js/answer-ui.js?v=3"></script>
 <script>
@@ -108,6 +102,7 @@ function renderLessons() {
   const done = AnswerTasks.WRITE.filter(t => best(t.id)).length, total = AnswerTasks.WRITE.length;
   $('progFill').style.width = `${(done / total) * 100}%`;
   $('progText').textContent = `${done} of ${total} done`;
+  Course.mountTopbar('write');
   const row = $('lessons'), on = row.querySelector('[aria-pressed="true"]');
   if (on && (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth)) row.scrollLeft = on.offsetLeft - 8;
 }
@@ -222,6 +217,7 @@ async function check() {
   const final = data ? AnswerScore.mergeAI(device, data) : device;
   draw(final, data ? null : AnswerUI.reasonText(reason));
   const prev = best(t.id); if (!prev || final.total > prev) store.set('rc-write-best-' + t.id, final.total);
+  store.set('rc-write-last-' + t.id, { at: new Date().toISOString(), total: final.total });
   renderLessons();
   window.__lastWrite = { device, data, reason };
 }
@@ -234,7 +230,7 @@ $('next').onclick = () => {
   const list = AnswerTasks.WRITE, i = list.findIndex(t => t.id === task.id);
   showTask(list[(i + 1) % list.length].id); window.scrollTo({ top: 0, behavior: 'smooth' });
 };
-showTask(store.get('rc-write-task', AnswerTasks.WRITE[0].id));
+showTask(new URLSearchParams(location.search).get('t') || store.get('rc-write-task', AnswerTasks.WRITE[0].id));
 </script>
 </body>
 </html>

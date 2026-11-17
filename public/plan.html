@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Learning Plan</title>
+<link rel="stylesheet" href="css/base.css?v=4">
+<style>
+  /* ---------- layout: plan on the left, activity on the right (tablet and up) ---------- */
+  .home { display: grid; gap: 24px; align-items: start; }
+  @media (min-width: 64em) { .home { grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; } .side { position: sticky; top: 16px; } }
+  .search { display: flex; align-items: center; gap: 10px; background: #e9ebef; border-radius: 99px; padding: 0 18px; min-width: min(100%, 300px); }
+  .search svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
+  .search input { border: 0; outline: 0; background: transparent; padding: 12px 0; width: 100%; font-size: 1rem; }
+  .search:focus-within { box-shadow: 0 0 0 3px rgba(53, 87, 197, .2); }
+
+  /* ---------- counts ---------- */
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .stat { border-radius: var(--r-lg); padding: 16px 12px; text-align: center; }
+  .stat b { display: block; font-size: clamp(1.875rem, 1.4rem + 2vw, 2.75rem); line-height: 1.05; font-weight: 750; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: .9375rem; color: #3d4250; }
+  .stat.total { background: var(--sky); }
+  .stat.done { background: var(--mint); } .stat.done span { color: var(--mint-ink); }
+  .stat.up { border: 2px dashed #cfd4dc; }
+
+  /* ---------- the path ---------- */
+  .path { position: relative; display: grid; gap: 22px; padding-left: 30px; list-style: none; margin: 0; }
+  .path::before { content: ""; position: absolute; left: 9px; top: 24px; bottom: 24px; border-left: 2px dashed var(--path); }
+  .node { position: relative; background: var(--card); border-radius: var(--r-xl); box-shadow: var(--shadow); padding: 22px 20px 18px; }
+  .node::before { content: ""; position: absolute; top: 40px; left: -26px; width: 12px; height: 12px; border-radius: 50%; background: var(--path); box-shadow: 0 0 0 4px var(--bg); }
+  .node.done::before { background: var(--path); }
+  .node:not(.done):not(.next)::before { background: var(--bg); border: 2px solid var(--path); }
+  .bubble { position: absolute; top: -12px; right: -6px; width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; background: var(--tone); box-shadow: 0 0 0 5px var(--bg); }
+  .bubble svg { width: 24px; height: 24px; }
+  .node .kind { margin: 0 0 6px; font-size: .8125rem; font-weight: 600; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .node .kind .no { width: 22px; height: 22px; border-radius: 50%; background: var(--soft); color: var(--text); display: grid; place-items: center; font-size: .75rem; font-weight: 750; }
+  .node h3 { margin: 0; padding-right: 36px; font-size: clamp(1.25rem, 1.05rem + .8vw, 1.625rem); line-height: 1.2; font-weight: 700; letter-spacing: -.02em; }
+  .node .desc { margin: 8px 0 0; color: #4b5162; max-width: 36ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .node .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 18px; }
+  .node .pill { font-size: .875rem; padding: 7px 14px; font-weight: 600; }
+  .pill.up { background: var(--soft); color: #4b5162; }
+  .pill svg { width: 15px; height: 15px; }
+  .go { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--frame); color: #fff; flex: none; text-decoration: none; }
+  .go svg { width: 20px; height: 20px; }
+  .go.light { background: var(--soft); color: var(--text); }
+
+  /* the next lesson: big, in its activity colour, tilted a little */
+  .node.next { background: var(--tone); box-shadow: 0 22px 40px -20px rgba(16, 24, 40, .35); transform: rotate(-1.5deg); padding: 26px 24px 22px; }
+  .node.next .bubble { display: none; }
+  .node.next .desc { color: #3d4250; }
+  .node.next .kind .no { background: rgba(255, 255, 255, .7); }
+  .play { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--text); text-decoration: none; flex: none;
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, .45), 0 0 0 20px rgba(255, 255, 255, .22); margin: 0 20px 4px 0; }
+  .play svg { width: 30px; height: 30px; margin-left: 4px; }
+  .node.next .desc { -webkit-line-clamp: 3; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: #fff; border-radius: 99px; padding: 9px 16px; font-weight: 600; font-size: .9375rem; }
+  .chip svg { width: 18px; height: 18px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .node { transition: transform .25s ease, box-shadow .25s ease; }
+    .node.next:hover { transform: rotate(0deg) translateY(-2px); }
+    .node:not(.next):hover { transform: translateY(-2px); }
+    .play { transition: transform .2s; } .play:hover { transform: scale(1.05); }
+  }
+
+  /* two staggered columns joined in the middle, on wider screens */
+  @media (min-width: 48em) {
+    .path { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 72px; row-gap: 22px; padding-left: 0; }
+    .path::before { left: 50%; margin-left: -1px; }
+    .node.l { grid-column: 1; } .node.r { grid-column: 2; }
+    .path:not(.filtered) .node { grid-row: var(--r) / span 2; }
+    .node.l::before { left: auto; right: -42px; }
+    .node.r::before { left: -42px; }
+    .node::after { content: ""; position: absolute; top: 45px; width: 30px; border-top: 2px dashed var(--path); }
+    .node.l::after { right: -30px; } .node.r::after { left: -30px; }
+    .node.next.l::after, .node.next.r::after { top: 47px; }
+  }
+  .empty { margin: 0; padding: 18px; border: 2px dashed #cfd4dc; border-radius: var(--r-lg); color: var(--muted); text-align: center; }
+
+  /* ---------- my activity ---------- */
+  .side h2 { margin: 0 0 14px; font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 750; letter-spacing: -.025em; }
+  .events { display: grid; gap: 14px; }
+  .evt { border-radius: var(--r-xl); padding: 14px; background: var(--tone); }
+  .evt header { display: flex; align-items: center; gap: 10px; padding: 2px 4px 10px; font-size: .9375rem; }
+  .evt header .ic { width: 34px; height: 34px; border-radius: 50%; background: rgba(255, 255, 255, .75); display: grid; place-items: center; }
+  .evt header .ic svg { width: 18px; height: 18px; }
+  .evt header b { flex: 1; font-weight: 650; }
+  .evt header time { color: #3d4250; font-size: .875rem; }
+  .evt .body { background: rgba(255, 255, 255, .6); border-radius: var(--r-md); padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .evt .body p { margin: 0; font-weight: 600; line-height: 1.35; }
+  .evt .body span { display: block; font-weight: 400; font-size: .875rem; color: #3d4250; }
+  .evt .score { flex: none; font-weight: 750; font-size: 1.125rem; font-variant-numeric: tabular-nums; }
+  .evt .score small { font-size: .75rem; font-weight: 600; color: #3d4250; }
+  .evt.read { --tone: var(--sky); } .evt.write { --tone: var(--butter); } .evt.speak { --tone: var(--lilac); }
+  .node.read { --tone: var(--sky); } .node.write { --tone: var(--butter); } .node.speak { --tone: var(--lilac); }
+</style>
+</head>
+<body>
+<header class="topbar" id="topbar"></header>
+
+<div class="panel">
+  <div class="pagehead">
+    <div><p class="crumb">Communication Skills</p><h1>My learning plan</h1></div>
+    <label class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span class="sr-only">Search lessons</span><input id="q" type="search" placeholder="Search lessons" autocomplete="off"></label>
+  </div>
+
+  <main class="home">
+    <section aria-label="Lessons" style="display:grid; gap:22px; min-width:0">
+      <div class="stats" aria-label="Your progress">
+        <div class="stat total"><b id="sTotal">0</b><span>Total</span></div>
+        <div class="stat done"><b id="sDone">0</b><span>Completed</span></div>
+        <div class="stat up"><b id="sUp">0</b><span>Upcoming</span></div>
+      </div>
+      <ol class="path" id="path"></ol>
+      <p class="empty" id="noMatch" hidden>No lessons match your search.</p>
+    </section>
+
+    <aside class="side" aria-labelledby="actTitle">
+      <h2 id="actTitle">My activity</h2>
+      <div class="events" id="events"></div>
+    </aside>
+  </main>
+</div>
+
+<script src="js/tasks.js?v=1"></script>
+<script src="js/course.js?v=1"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const { svg, ICON } = Course;
+const ARROW = '<path d="M5 12h14M13 6l6 6-6 6"/>', PLAY = '<path d="M7 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>',
+  CLOCK = '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2"/>', CHECK = '<path d="m5 12.5 4.5 4.5L19 7.5"/>';
+
+function nodeHTML(l, i, next) {
+  const side = i % 2 ? 'r' : 'l', score = l.done ? ` · best ${l.best}/${l.max}` : '';
+  const kind = `<p class="kind"><span class="no">${i + 1}</span>${esc(l.kindName)} · ${esc(l.meta)}</p>`;
+  if (next) return `<li class="node next ${l.kind} ${side}" style="--r:${i + 1}" data-title="${esc(l.title.toLowerCase())}">
+      ${kind}<h3>${esc(l.title)}</h3><p class="desc">${esc(l.desc)}</p>
+      <div class="row"><span class="chip">${svg(CLOCK)}Up next</span>
+        <a class="play" href="${l.href}" aria-label="Start ${esc(l.title)}">${svg(PLAY)}</a></div>
+    </li>`;
+  return `<li class="node ${l.kind} ${side}${l.done ? ' done' : ''}" style="--r:${i + 1}" data-title="${esc(l.title.toLowerCase())}">
+      <span class="bubble">${svg(ICON[l.kind])}</span>
+      ${kind}<h3>${esc(l.title)}</h3><p class="desc">${esc(l.desc)}</p>
+      <div class="row">
+        ${l.done ? `<span class="pill done">${svg(CHECK)}Completed${score}</span>` : `<span class="pill up">${svg(CLOCK)}Upcoming</span>`}
+        <a class="go${l.done ? ' light' : ''}" href="${l.href}" aria-label="${l.done ? 'Practise again' : 'Start'}: ${esc(l.title)}" title="${l.done ? 'Practise again' : 'Start'}">${svg(ARROW)}</a>
+      </div>
+    </li>`;
+}
+
+function eventsHTML(all) {
+  const recent = all.filter(l => l.last && l.last.at).sort((a, b) => String(b.last.at).localeCompare(String(a.last.at))).slice(0, 5);
+  if (!recent.length) return '<p class="empty">Your practice will show here. Start with the first lesson on the left.</p>';
+  const day = at => { const d = new Date(at); return isNaN(d) ? '' : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); };
+  return recent.map(l => `<article class="evt ${l.kind}">
+      <header><span class="ic">${svg(ICON[l.kind])}</span><b>${esc(l.kindName)}</b><time datetime="${esc(l.last.at)}">${day(l.last.at)}</time></header>
+      <a class="body" href="${l.href}" style="text-decoration:none;color:inherit"><p>${esc(l.title)}<span>Last try · tap to practise again</span></p>
+        <span class="score">${l.last.total}<small>/${l.max}</small></span></a>
+    </article>`).join('');
+}
+
+function render() {
+  const all = Course.lessons(), s = Course.summary();
+  $('sTotal').textContent = s.total; $('sDone').textContent = s.done; $('sUp').textContent = s.upcoming;
+  $('path').innerHTML = all.map((l, i) => nodeHTML(l, i, s.next && l.kind === s.next.kind && l.id === s.next.id)).join('');
+  $('events').innerHTML = eventsHTML(all);
+  filter();
+}
+function filter() {
+  const q = $('q').value.trim().toLowerCase(); let shown = 0;
+  document.querySelectorAll('#path .node').forEach(n => { const ok = !q || n.dataset.title.includes(q); n.hidden = !ok; shown += ok; });
+  $('path').classList.toggle('filtered', !!q); // a filtered list just stacks in its two columns
+  $('noMatch').hidden = shown > 0;
+}
+$('q').addEventListener('input', filter);
+Course.mountTopbar('plan');
+render();
+// coming back from a lesson (or another tab) shows fresh progress
+addEventListener('pageshow', () => { Course.mountTopbar('plan'); render(); });
+</script>
+</body>
+</html>

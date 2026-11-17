@@ -1,6 +1,6 @@
 # Reading Check
 
-Speaking and writing practice for an English communication course, built to run **offline on a tablet**. Three activities, switched from the top of every page:
+Speaking and writing practice for an English communication course, built to run **offline on a tablet**. `plan.html` is the home page (**My learning plan**): every lesson in order on a path, the next one to do, Total / Completed / Upcoming counts and your recent tries. Three activities, switched from the black bar at the top of every page:
 
 | Activity | Page | What the learner does | How it is checked |
 |---|---|---|---|
@@ -15,8 +15,8 @@ Written and spoken feedback both use the same six parts: level and score (out of
 | Folder | What it is |
 |---|---|
 | `public/` | **The website.** Vercel serves this folder as the site root (see `vercel.json`). |
-| `public/css/` | `base.css` is the shared course look for all three pages (header, tabs, lesson cards, steps, paper surfaces, score ring, buttons); `course.css` adds the Write and Speak parts |
-| `public/js/` | `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page) |
+| `public/css/` | `base.css` is the shared course look for every page (black top bar, panel, pastel lesson cards, steps, paper surfaces, score ring, floating action bar); `course.css` adds the Write and Speak parts |
+| `public/js/` | `course.js` (the reading passages, the learning-plan order, progress and the shared top bar), `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page) |
 | `api/evaluate.js` | Vercel server function that asks the AI for feedback. Only the tasks in `tasks.js` can be marked |
 | `tests/` | Unit tests for all the scoring rules and the server function |
 | `tools/` | `make_noisy_samples.py`: builds the noisy test recordings |

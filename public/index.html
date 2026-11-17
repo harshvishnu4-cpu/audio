@@ -9,7 +9,7 @@
   small model) running inside a WebView is fast and accurate enough to catch skipped / wrong /
   extra words when a learner reads a passage aloud. Not production code.
 -->
-<link rel="stylesheet" href="css/base.css?v=1">
+<link rel="stylesheet" href="css/base.css?v=4">
 <style>
   :root {
     --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0; --edge: #c3cad6;
@@ -365,7 +365,7 @@
 
   /* ===== course shell: shared look in css/base.css; these are the Read aloud page's own tweaks ===== */
   :root { --max: 1080px; }
-  body { background: var(--bg); }
+  body { background: var(--frame); }
   .progress .track { width: 90px; }
   .modes { background: var(--soft); }
   main { max-width: var(--max); display: grid; gap: 18px; padding: 18px var(--gutter) 110px; }
@@ -387,30 +387,22 @@
   .analysis, .quiz { margin-top: 0; }
 </style>
 </head>
-<body>
-<header class="appbar">
-  <div class="appbar-in">
-    <p class="crumb">Communication Skills · Reading</p>
-    <div class="title-row">
-      <h1>Reading practice</h1>
-      <div class="title-tools">
-        <div class="progress" aria-label="Your progress"><div class="track"><div class="fill" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
-        <div class="modes" role="group" aria-label="Practice or test">
-          <button type="button" id="modePractice" aria-pressed="true">Practice</button>
-          <button type="button" id="modeTest" aria-pressed="false">Test</button>
-        </div>
-        <button class="tools-btn" id="toolsBtn" type="button">Tools</button>
-      </div>
+<body data-kind="read">
+<header class="topbar" id="topbar"></header>
+<div class="panel">
+<div class="pagehead">
+  <div><p class="crumb">Communication Skills · Reading</p><h1>Reading practice</h1></div>
+  <div class="title-tools">
+    <div class="progress" aria-label="Your progress"><div class="track"><div class="fill" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
+    <div class="modes" role="group" aria-label="Practice or test">
+      <button type="button" id="modePractice" aria-pressed="true">Practice</button>
+      <button type="button" id="modeTest" aria-pressed="false">Test</button>
     </div>
-    <nav class="tabs" aria-label="Activity">
-      <a href="index.html" aria-current="page">Read aloud</a>
-      <a href="write.html">Write</a>
-      <a href="speak.html">Speak</a>
-    </nav>
+    <button class="tools-btn" id="toolsBtn" type="button">Tools</button>
   </div>
   <!-- the passage list the reading logic uses; the lesson cards drive it -->
   <select id="passageSelect" class="sr-only" aria-hidden="true" tabindex="-1"></select>
-</header>
+</div>
 
 <main>
   <section aria-label="Choose a passage"><div class="lessons" id="lessons"></div></section>
@@ -517,6 +509,7 @@
     </div>
   </section>
 </main>
+</div>
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
     <span class="grow" id="actionNote"></span>
@@ -619,6 +612,8 @@
 
 <script src="lib/vosk.js"></script>
 <script src="js/scoring.js?v=3"></script>
+<script src="js/tasks.js?v=1"></script>
+<script src="js/course.js?v=1"></script>
 <script>
 const RS = window.ReadingScore;
 // Offline speech models. Candidates live in models/candidates/ (kept out of git: too big for GitHub);
@@ -629,23 +624,7 @@ const MODELS = [
 ];
 const DEFAULT_MODEL = 'en-in-small';
 
-const PASSAGES = [
-  { id: 'morning-walk', title: 'Morning Walk',
-    text: 'Every morning my grandmother and I go for a walk in the park. We look at the birds, the trees and the flowers. On the way home, we buy fresh fruit from the market.',
-    questions: [
-      { q: 'Who goes for a walk every morning?', options: ['The writer and their grandmother', 'The writer and a friend', 'Only the grandmother'], answer: 0 },
-      { q: 'Where do they walk?', options: ['In the market', 'In the park', 'In the garden'], answer: 1 },
-      { q: 'What do they buy on the way home?', options: ['Vegetables', 'Flowers', 'Fresh fruit'], answer: 2 },
-    ] },
-  { id: 'good-listener', title: 'A Good Listener',
-    text: 'A good listener looks at the speaker and waits for their turn to talk. They ask questions when they do not understand. Listening carefully helps us speak with confidence.',
-    questions: [
-      { q: 'What does a good listener look at?', options: ['The speaker', 'The floor', 'A book'], answer: 0 },
-      { q: 'What do they do when they do not understand?', options: ['Stay quiet', 'Ask questions', 'Start talking'], answer: 1 },
-      { q: 'What does listening carefully help us do?', options: ['Read faster', 'Write neatly', 'Speak with confidence'], answer: 2 },
-    ] },
-  { id: 'own', title: 'My own passage', text: 'Type your passage in Tools.' },
-];
+const PASSAGES = Course.PASSAGES; // in js/course.js, shared with the Learning plan page
 
 // Synthetic test recordings (macOS "Aman" Indian English voice) with known, deliberate mistakes.
 const SAMPLES = [
@@ -802,7 +781,7 @@ const LESSON_ICONS = {
   'good-listener': '<path d="M6 8a6 6 0 1 1 12 0c0 3-2 4-3 5.5S14 17 12 19s-4 1-4-1"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0"/>',
   'own': '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
 };
-const keyFor = text => { let h = 0; for (const ch of text) h = (h * 31 + ch.charCodeAt(0)) | 0; return 'rc-tries2-' + h; };
+const keyFor = Course.keyFor;
 function bestFor(p) { const t = store.get(keyFor(p.text), []); return t.length ? Math.max(...t.map(x => x.total)) : null; }
 function renderLessons() {
   const sel = +$('passageSelect').value;
@@ -817,6 +796,7 @@ function renderLessons() {
   const preset = PASSAGES.filter(p => p.id !== 'own'), done = preset.filter(p => bestFor(p) !== null).length;
   $('progFill').style.width = `${(done / preset.length) * 100}%`;
   $('progText').textContent = `${done} of ${preset.length} done`;
+  Course.mountTopbar('read');
   const row = $('lessons'), on = row.querySelector('[aria-pressed="true"]');
   if (on && (on.offsetLeft < row.scrollLeft || on.offsetLeft + on.offsetWidth > row.scrollLeft + row.clientWidth)) row.scrollLeft = on.offsetLeft - 8;
 }
@@ -1377,6 +1357,7 @@ $('playback').addEventListener('pause', () => { $('playAll').textContent = 'Hear
 PASSAGES.forEach((p, i) => $('passageSelect').add(new Option(p.title, i)));
 $('passageSelect').onchange = () => { $('passageText').value = passage().text; current = null; renderPassage(); };
 $('passageText').oninput = () => { current = null; renderPassage(); };
+{ const want = PASSAGES.findIndex(p => p.id === new URLSearchParams(location.search).get('p')); if (want >= 0) $('passageSelect').value = want; }
 $('passageSelect').onchange();
 
 $('mic').onclick = () => (rec ? stopMic() : startMic());
