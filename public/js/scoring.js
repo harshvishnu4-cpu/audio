@@ -31,6 +31,10 @@
     wordGapSec: 0.3,        // a gap this long between words inside a phrase breaks the phrase
     wordByWordShare: 0.45,  // if this share of in-phrase gaps are breaks, the reading is word by word
     minSilenceSec: 0.12,    // quieter stretches shorter than this are part of speech (stop consonants), not pauses
+    // Recording quality, from the loudness spread (speech level vs background, in dB). Tuned on synthetic
+    // classroom noise (clean ≥ 33, 10 dB noise ≈ 15–22, 0 dB noise ≈ 8–13): re-tune on real recordings.
+    noisySnrDb: 24,         // below this: noisy. Small words and dropped endings that only one pass heard aren't marked
+    tooNoisySnrDb: 13.5,    // below this: too noisy to score at all
     // Rubric bands. PLACEHOLDERS until replaced with the course's own rubric.
     rubric: {
       accuracy: [[97, 4], [90, 3], [80, 2], [0, 1]], // [minimum accuracy %, marks out of 4]
@@ -141,7 +145,8 @@
   // ---------- main analysis ----------
   // silences: optional [{ from, to }] quiet stretches measured from the audio itself. The engine's word
   // times run into each other (silence is folded into the words), so real pauses come from the audio.
-  function analyse({ text, primary, open = null, silences = null, config = {} }) {
+  // snrDb: optional recording-quality estimate (see CONFIG.noisySnrDb).
+  function analyse({ text, primary, open = null, silences = null, snrDb = null, config = {} }) {
     const C = { ...CONFIG, ...config, rubric: { ...CONFIG.rubric, ...(config.rubric || {}) } };
     const tokens = tokenize(text);
     const toHyp = ws => (ws || []).map(w => ({ word: w.word === '[unk]' ? '[unk]' : norm(w.word), conf: +w.conf, start: +w.start, end: +w.end })).filter(w => w.word);
@@ -231,6 +236,18 @@
       extras.sort((a, b) => a.start - b.start);
     } else {
       for (const w of words) if (w.start !== null) w.clarity = w.status === 'unclear' ? 'unclear' : w.conf >= C.clearConf ? 'clear' : 'close';
+    }
+
+    // 3b. noisy recording: don't accuse the reader of what noise most often fakes
+    const quality = snrDb === null ? 'unknown' : snrDb < C.tooNoisySnrDb ? 'too-noisy' : snrDb < C.noisySnrDb ? 'noisy' : 'good';
+    if (quality === 'noisy') {
+      for (const w of words) {
+        // a quiet ending ("-s", "-ed") vanishes under noise: count it only when the open pass heard the short form too
+        if (w.status === 'change' && w.pattern && !(w.openHeard || '').split(' ').some(o => variantPattern(w.n, o))) { w.status = 'tip'; w.soundedLike = w.heard; w.noisy = true; }
+        // small words are the first thing noise swallows or swaps
+        else if ((w.status === 'skip' || w.status === 'change') && w.small) { w.status = 'unclear'; w.noisy = true; }
+      }
+      for (const x of extras) if (x.kind === 'added' && x.small) { x.kind = 'noise'; x.noisy = true; }
     }
 
     // 4. meaning and importance of each mistake
@@ -380,6 +397,7 @@
       pauses: { ...pauses, stopShare: +stopShare.toFixed(2) }, sentences, mistakes, patterns, rubric,
       message: { headline, lead, tone: rubric.total >= 9 ? 'praise' : rubric.total >= 7 ? 'good' : 'guide' },
       heardTooLittle: hyp.length < tokens.length * 0.3,
+      quality, snrDb: snrDb === null ? null : +snrDb.toFixed(1), tooNoisy: quality === 'too-noisy',
     };
   }
 

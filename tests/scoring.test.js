@@ -182,3 +182,30 @@ test('repeating a short phrase is a repeat, not an addition', () => {
   assert.equal(r.counts.added, 0);
   assert.equal(r.counts.repeats, 2);
 });
+
+test('too noisy: flagged so nothing is scored', () => {
+  const r = S.analyse({ text: P1, primary: heard(words(P1).slice(0, 12), { text: P1 }), snrDb: 9 });
+  assert.equal(r.quality, 'too-noisy');
+  assert.equal(r.tooNoisy, true);
+});
+
+test('noisy: small-word slips and unconfirmed dropped endings are not counted, content-word mistakes still are', () => {
+  const said = words(P1).filter(w => w !== 'my').map(w => ({ park: 'garden', birds: 'bird' }[w] || w));
+  const primary = heard(said, { text: P1 });
+  const clean = S.analyse({ text: P1, primary, snrDb: 40 });
+  assert.equal(clean.words.find(w => w.n === 'my').status, 'skip');
+  assert.equal(clean.words.find(w => w.n === 'birds').status, 'change');
+  const noisy = S.analyse({ text: P1, primary, snrDb: 18 });
+  assert.equal(noisy.quality, 'noisy');
+  assert.equal(noisy.words.find(w => w.n === 'my').status, 'unclear');
+  assert.equal(noisy.words.find(w => w.n === 'birds').status, 'tip');
+  assert.equal(noisy.words.find(w => w.n === 'park').status, 'change');
+  assert.ok(noisy.accuracy > clean.accuracy);
+});
+
+test('noisy: a dropped ending both passes heard still counts', () => {
+  const said = words(P1).map(w => (w === 'birds' ? 'bird' : w));
+  const primary = heard(said, { text: P1 });
+  const r = S.analyse({ text: P1, primary, open: primary, snrDb: 18 });
+  assert.equal(r.words.find(w => w.n === 'birds').status, 'change');
+});

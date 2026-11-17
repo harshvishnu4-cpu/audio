@@ -92,3 +92,28 @@ On the tablet, open Chrome and go to `http://localhost:8765`.
 5. **Noise:** try once in a normal classroom.
 
 Send back the numbers and any wrong results. Those decide the final design.
+
+## Speech model comparison (offline)
+
+**Tools → Speech model** picks the model, and **Compare models on all samples** runs this benchmark on whatever device the page is open on. Run it on the target tablet: the speed column is the one that matters there.
+
+The test set is 9 sample readings (including a slow one), each played clean and with classroom-like noise mixed in at 10 dB and at 0 dB. That's 27 recordings, each with a known transcript and known planted mistakes. Rebuild the noisy copies with `python3 tools/make_noisy_samples.py`.
+
+Results on a laptop (16 Nov 2026), with noise handling on:
+
+| Model | Word errors (clean / 10 dB / 0 dB) | Mistakes caught (clean / 10 dB) | False marks (clean / 10 dB) | Not scored at 0 dB | Speed |
+|---|---|---|---|---|---|
+| **Indian English, small, 36 MB (default)** | 7.9% / 28.5% / 93% | 9 of 10 / 5 of 10 | 8 / 14 | 9 of 9 | 0.20× real time |
+| US English, small, 40 MB | 10.8% / 31.1% / 115% | 8 of 10 / 5 of 10 | 7 / 9 | 9 of 9 | 0.23× |
+| US English, large, 128 MB | not usable | — | — | — | 1.9×: can't keep up, even on a laptop |
+
+What we learned:
+
+- **No bigger offline model helps.** The large model is too slow for a tablet, and the US small model is a little worse on clean speech. The Indian English small model stays the default. The US small model is worth one test with real learners, because it made fewer false marks in noise.
+- **Noise is the real problem, not the model.** At 10 dB noise, word errors go from about 8% to about 29%. At 0 dB, every model fails.
+- **What the noise handling changed:**
+    - The page now estimates how noisy each recording is, from the gap between speech level and background level.
+    - Below 13.5 dB it doesn't score at all and asks the learner to move somewhere quieter. Before this, the same recordings produced 242 false marks.
+    - Between 13.5 and 24 dB it still scores, but doesn't mark small-word slips or dropped endings that only one listening pass heard. False marks at 10 dB fell from 35 to 14. The cost is that it caught 5 of 10 planted mistakes instead of 7.
+- **Thresholds are placeholders.** The 13.5 and 24 dB cut-offs are tuned on synthetic noise. Re-tune them from real classroom recordings; they are in `CONFIG` in `public/js/scoring.js`.
+- **The US small model isn't in git** (it sits in `public/models/candidates/`), so it isn't on Vercel. Copy it onto the server or into the app to test it on a tablet.

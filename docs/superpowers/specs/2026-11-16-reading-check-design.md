@@ -110,6 +110,14 @@ Android app (native)
   - spot accents (§8),
   - name words that are not in the passage.
 - **Cost:** the two passes roughly double the processing. On this Mac both together ran at about 0.15× real time. **This must be measured on the target tablets** (§14, Phase 0).
+- **Offline model choice (benchmarked 16 Nov 2026):** keep the Indian English small model.
+    - The US English small model was slightly worse on clean speech.
+    - The 128 MB US model ran slower than real time even on a laptop.
+    - Details and numbers are in `docs/testing-on-tablet.md`.
+- **Recording quality gate:** each recording gets a noise estimate (speech level over background, in dB).
+    - Below 13.5 dB: not scored; the learner is asked to try somewhere quieter.
+    - Below 24 dB: small-word slips and dropped endings heard by only one pass are shown as unclear, not as mistakes.
+    - Both cut-offs are placeholders until tuned on real recordings.
 - **Pauses are measured from the audio, not from word times.**
   - The engine's word times run into each other, because it folds silence into the words. In tests, even 0.5 s gaps after every word showed as 0.00 s.
   - The page therefore tracks loudness in 20 ms slices and finds the quiet stretches (≥ 0.12 s).

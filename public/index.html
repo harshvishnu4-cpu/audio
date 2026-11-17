@@ -479,6 +479,15 @@
     </div>
 
     <div class="field">
+      <label for="modelSelect">Speech model</label>
+      <select id="modelSelect"></select>
+      <p>Runs on this device. Bigger models are more accurate but slower to download and load.</p>
+      <p><button type="button" class="filebtn" id="benchRun">Compare models on all samples</button></p>
+      <p>Runs every sample clean and with classroom noise added, on each model available here. It takes a few minutes; try it on the real tablet.</p>
+      <div id="benchOut" class="engine"></div>
+    </div>
+
+    <div class="field">
       <label for="mode">Listening mode</label>
       <select id="mode">
         <option value="sentences">Passage sentences + words (best in tests)</option>
@@ -545,10 +554,16 @@
 </dialog>
 
 <script src="lib/vosk.js"></script>
-<script src="js/scoring.js"></script>
+<script src="js/scoring.js?v=3"></script>
 <script>
 const RS = window.ReadingScore;
-const MODEL_URL = 'models/en-in.tar.gz';
+// Offline speech models. Candidates live in models/candidates/ (kept out of git: too big for GitHub);
+// a model that isn't on this server is shown as unavailable.
+const MODELS = [
+  { id: 'en-in-small', url: 'models/en-in.tar.gz', label: 'Indian English, small (36 MB)' },
+  { id: 'en-us-small', url: 'models/candidates/en-us-small.tar.gz', label: 'US English, small (40 MB)' },
+];
+const DEFAULT_MODEL = 'en-in-small';
 
 const PASSAGES = [
   { id: 'morning-walk', title: 'Morning Walk',
@@ -570,22 +585,30 @@ const PASSAGES = [
 
 // Synthetic test recordings (macOS "Aman" Indian English voice) with known, deliberate mistakes.
 const SAMPLES = [
-  { file: 'samples/p1-correct.wav', passage: 0, label: 'Morning Walk, read correctly',
-    expect: 'Read perfectly. It should get full marks for accuracy.' },
-  { file: 'samples/p1-skipped.wav', passage: 0, label: 'Morning Walk, 4 words skipped',
+  // said: what the recording actually says (for word error rate). mistakes: what the scoring should find.
+  { file: 'samples/p1-correct.wav', passage: 0, label: 'Morning Walk, read correctly', mistakes: [],
+    said: PASSAGES[0].text, expect: 'Read perfectly. It should get full marks for accuracy.' },
+  { file: 'samples/p1-slow.wav', passage: 0, label: 'Morning Walk, read slowly', mistakes: [],
+    said: PASSAGES[0].text, expect: 'Read correctly but slowly, like a young reader. No mistakes; pace should be marked slow.' },
+  { file: 'samples/p1-skipped.wav', passage: 0, label: 'Morning Walk, 4 words skipped', mistakes: ['skip:my', 'skip:the', 'skip:trees', 'skip:fresh'],
+    said: 'Every morning grandmother and I go for a walk in the park. We look at the birds and the flowers. On the way home, we buy fruit from the market.',
     expect: 'Skips "my", "the trees" and "fresh". "Trees" and "fresh" change the meaning; "my" and "the" do not.' },
-  { file: 'samples/p1-wrong.wav', passage: 0, label: 'Morning Walk, 2 words changed',
+  { file: 'samples/p1-wrong.wav', passage: 0, label: 'Morning Walk, 2 words changed', mistakes: ['change:park', 'change:fruit'],
+    said: 'Every morning my grandmother and I go for a walk in the garden. We look at the birds, the trees and the flowers. On the way home, we buy fresh vegetables from the market.',
     expect: 'Says "garden" for "park" and "vegetables" for "fruit". Both change the meaning and should come first.' },
-  { file: 'samples/p1-endings.wav', passage: 0, label: 'Morning Walk, dropped "-s" endings',
+  { file: 'samples/p1-endings.wav', passage: 0, label: 'Morning Walk, dropped "-s" endings', mistakes: ['change:birds', 'change:trees', 'change:flowers'],
+    said: 'Every morning my grandmother and I go for a walk in the park. We look at the bird, the tree and the flower. On the way home, we buy fresh fruit from the market.',
     expect: 'Says "bird", "tree" and "flower" for "birds", "trees" and "flowers". It should name the "-s" pattern in one line.' },
-  { file: 'samples/p2-extra.wav', passage: 1, label: 'A Good Listener, a repeat and an added word',
+  { file: 'samples/p2-extra.wav', passage: 1, label: 'A Good Listener, a repeat and an added word', mistakes: ['added:many'],
+    said: 'A good listener looks at the the speaker and waits for their turn to talk. They ask many questions when they do not understand. Listening carefully helps us speak with confidence.',
     expect: 'Repeats "the" ("at the the speaker", not a mistake) and adds "many" ("ask many questions").' },
-  { file: 'samples/p2-selfcorrect.wav', passage: 1, label: 'A Good Listener, fixes a word',
+  { file: 'samples/p2-selfcorrect.wav', passage: 1, label: 'A Good Listener, fixes a word', mistakes: [],
+    said: 'A good listener looks at the speaker and waits for their turn to talk. They ask question, questions when they do not understand. Listening carefully, listening carefully helps us speak with confidence.',
     expect: 'Says "question… questions" and repeats "listening carefully". Neither should count as a mistake.' },
-  { file: 'samples/p2-hesitant.wav', passage: 1, label: 'A Good Listener, 2 pauses mid-phrase',
-    expect: 'Stops for about 1.4 s before "speaker" and 1.1 s before "not". Phrasing should drop.' },
-  { file: 'samples/p1-wordbyword.wav', passage: 0, label: 'Morning Walk, one word at a time',
-    expect: 'Reads with a short gap after every word. It should say the reading is word by word.' },
+  { file: 'samples/p2-hesitant.wav', passage: 1, label: 'A Good Listener, 2 pauses mid-phrase', mistakes: [],
+    said: PASSAGES[1].text, expect: 'Stops for about 1.4 s before "speaker" and 1.1 s before "not". Phrasing should drop.' },
+  { file: 'samples/p1-wordbyword.wav', passage: 0, label: 'Morning Walk, one word at a time', mistakes: [],
+    said: PASSAGES[0].text, expect: 'Reads with a short gap after every word. It should say the reading is word by word.' },
 ];
 
 const TYPE_LABEL = { skip: 'Skipped', change: 'Changed', added: 'Added', unclear: 'Unclear', tip: 'Sound tip', selfc: 'Fixed it yourself' };
@@ -647,7 +670,7 @@ function makeSessions(sampleRate, onProgress) {
   const loud = loudnessTracker(sampleRate);
   return {
     feed(f32, sr) { loud.push(f32); primary.feed(f32, sr); if (open) open.feed(f32.slice(), sr); },
-    async finish() { const [p, o] = await Promise.all([primary.finish(), open ? open.finish() : null]); return { primary: p, open: o, silences: loud.silences() }; },
+    async finish() { const [p, o] = await Promise.all([primary.finish(), open ? open.finish() : null]); return { primary: p, open: o, silences: loud.silences(), snrDb: loud.snrDb() }; },
   };
 }
 
@@ -658,6 +681,12 @@ function loudnessTracker(sampleRate) {
   let sum = 0, n = 0;
   return {
     push(f32) { for (let i = 0; i < f32.length; i++) { sum += f32[i] * f32[i]; if (++n === frame) { rms.push(Math.sqrt(sum / frame)); sum = 0; n = 0; } } },
+    // speech level (90th percentile) over background (10th percentile), in dB
+    snrDb() {
+      if (rms.length < 10) return null;
+      const so = [...rms].sort((a, b) => a - b), q = p => so[Math.min(so.length - 1, Math.floor(p * so.length))];
+      return Math.min(60, 20 * Math.log10((q(0.9) + 1e-9) / (q(0.1) + 1e-9)));
+    },
     silences() {
       if (rms.length < 10) return [];
       const sorted = [...rms].sort((a, b) => a - b), pick = p => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
@@ -819,15 +848,16 @@ async function runAudio(arrayBuffer, playUrl, expectText) {
 
 // ---------- results ----------
 function showResults(heard, info, playUrl, expectText) {
-  const a = RS.analyse({ text: passageText(), primary: heard.primary, open: heard.open, silences: heard.silences });
+  const a = RS.analyse({ text: passageText(), primary: heard.primary, open: heard.open, silences: heard.silences, snrDb: heard.snrDb });
   current = { id: Date.now().toString(36), at: new Date().toISOString(), passageId: passage().id, title: passage().title, text: passageText(),
               mode: appMode, source: info.source, analysis: a, playUrl, expectText, review: null, quiz: null };
-  if (!a.heardTooLittle) saveTry(current);
+  if (!a.heardTooLittle && !a.tooNoisy) saveTry(current);
   setMic('idle', 'Tap to read again');
   showCurrent();
 
   $('engineInfo').innerHTML =
-    `<p>Mode: ${esc($('mode').selectedOptions[0].text)}.</p><p>${esc(info.speed)} Engine loaded in ${(modelLoadMs / 1000).toFixed(1)} s.</p>` +
+    `<p>Mode: ${esc($('mode').selectedOptions[0].text)}. Model: ${esc((MODELS.find(x => x.id === modelId) || {}).label || '')}.</p><p>${esc(info.speed)} Engine loaded in ${(modelLoadMs / 1000).toFixed(1)} s.</p>` +
+    `<p>Recording quality: ${a.snrDb === null ? 'unknown' : `${a.snrDb} dB speech over background (${a.quality})`}.</p>` +
     `<p>Passage pass heard: ${esc(heard.primary.map(w => w.word).join(' ') || '(nothing)')}</p>` +
     (heard.open ? `<p>Open pass heard: ${esc(heard.open.map(w => w.word).join(' ') || '(nothing)')}</p>` : '') +
     '<table><tr><th>Word</th><th>Status</th><th>Conf.</th><th>Open pass</th></tr>' +
@@ -848,6 +878,12 @@ function showCurrent() {
   $('after').hidden = !c.playUrl;
   $('note').textContent = c.expectText || ''; $('note').hidden = !c.expectText;
 
+  if (a.tooNoisy) {
+    $('verdict').textContent = 'It was too noisy to check your reading.';
+    $('lead').textContent = 'Move somewhere quieter, hold the tablet a little closer, and try again.'; $('lead').hidden = false;
+    $('passage').classList.add('plain');
+    return;
+  }
   if (a.heardTooLittle) {
     $('verdict').textContent = 'I could not hear enough of the passage.';
     $('lead').textContent = 'Hold the tablet closer and read a little louder, then try again.'; $('lead').hidden = false;
@@ -856,7 +892,8 @@ function showCurrent() {
   const m = marksOf(c);
   $('grade').innerHTML = `<span>${m.total}<small>/10</small></span>`; $('grade').hidden = false;
   $('verdict').textContent = c.review ? 'Checked by your teacher' : a.message.headline;
-  $('lead').textContent = c.review ? (c.review.note || `Score: ${m.total} out of 10.`) : practice ? a.message.lead : 'Your reading has been scored. Your teacher can check it.';
+  $('lead').textContent = (c.review ? (c.review.note || `Score: ${m.total} out of 10.`) : practice ? a.message.lead : 'Your reading has been scored. Your teacher can check it.') +
+    (a.quality === 'noisy' && !c.review ? ' It was a bit noisy, so small words and word endings were not marked.' : '');
   $('lead').hidden = false;
   $('scoreLine').innerHTML = `<span>Accuracy <b>${m.accuracy}/4</b></span><span>Pace <b>${m.pace}/3</b></span><span>Phrasing <b>${m.phrasing}/3</b></span>` +
     `<span><b>${a.wcpm}</b> words a minute</span>` + (c.review ? '<span class="reviewed">Checked by teacher</span>' : '');
@@ -1253,16 +1290,108 @@ $('fileInput').onchange = async e => {
   e.target.value = '';
 };
 
-(async () => {
+// ---------- speech model: choose, load, compare ----------
+let modelId = null;
+async function loadModel(id) {
+  const m = MODELS.find(x => x.id === id) || MODELS[0];
+  if (model && modelId === m.id) return true;
+  if (model) { try { model.terminate(); if (model.worker) model.worker.terminate(); } catch (e) {} model = null; }
+  setMic('disabled', `Loading the speech model (${m.label})…`);
   const t0 = performance.now();
   try {
-    model = await Vosk.createModel(MODEL_URL);
-    modelLoadMs = performance.now() - t0;
+    model = await Vosk.createModel(m.url);
+    modelLoadMs = performance.now() - t0; modelId = m.id;
     setMic('idle', 'Tap the microphone and read aloud');
+    return true;
   } catch (e) {
-    console.error(e);
+    console.error(e); model = null; modelId = null;
     setMic('disabled', 'The listener could not load. Open this page through the test server, not as a file.', true);
+    return false;
   }
+}
+async function modelAvailable(m) {
+  try { const r = await fetch(m.url, { method: 'HEAD' }); return r.ok; } catch (e) { return false; }
+}
+
+// Word error rate: word-level edit distance between what was heard and what was said, over words said.
+function wer(heardWords, saidText) {
+  const ref = RS.tokenize(saidText).map(t => t.n), hyp = heardWords.map(w => RS.norm(w)).filter(w => w && w !== 'unk');
+  const ops = RS.align(ref, hyp.map(w => ({ word: w })));
+  const errors = ops.filter(o => o.t !== 'ok').length;
+  return ref.length ? errors / ref.length : 0;
+}
+// Did the scoring find the planted mistakes, and how many marks did it add that aren't real?
+function judge(a, expected) {
+  const found = [];
+  for (const m of a.mistakes) if (m.kind !== 'unclear') found.push(`${m.kind === 'tip' && m.pattern ? 'change' : m.kind}:${RS.norm(m.word)}`);
+  let caught = 0; const left = [...found];
+  for (const e of expected) { const k = left.indexOf(e); if (k >= 0) { caught++; left.splice(k, 1); } }
+  const falseMarks = left.filter(f => !f.startsWith('tip:')).length;
+  return { caught, expected: expected.length, falseMarks };
+}
+
+async function decodeFile(url) {
+  audioCtx = audioCtx || new AudioContext();
+  return audioCtx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+}
+async function runCase(sample, file) {
+  const audio = await decodeFile(file);
+  const data = audio.getChannelData(0), sr = audio.sampleRate;
+  const text = PASSAGES[sample.passage].text;
+  const mode = $('mode').value, primary = makeSession(sr, RS.grammarFor(text, mode)), open = makeSession(sr, null), loud = loudnessTracker(sr);
+  const t0 = performance.now();
+  for (let i = 0; i < data.length; i += 4096) { const c = data.slice(i, i + 4096); loud.push(c); primary.feed(c, sr); open.feed(c.slice(), sr); }
+  const [p, o] = await Promise.all([primary.finish(), open.finish()]);
+  const sec = (performance.now() - t0) / 1000;
+  const a = RS.analyse({ text, primary: p, open: o, silences: loud.silences(), snrDb: loud.snrDb() });
+  const refused = a.tooNoisy || a.heardTooLittle;
+  const j = refused ? { caught: 0, expected: sample.mistakes.length, falseMarks: 0 } : judge(a, sample.mistakes);
+  return { wer: wer(o.map(w => w.word), sample.said), ...j, refused, rtf: sec / audio.duration };
+}
+
+async function compareModels() {
+  const btn = $('benchRun'); btn.disabled = true;
+  const out = $('benchOut'), rows = [], keep = modelId || DEFAULT_MODEL;
+  const conditions = [['clean', s => s.file], ['noise 10 dB', s => s.file.replace('samples/', 'samples/noisy/').replace('.wav', '-snr10.wav')], ['noise 0 dB', s => s.file.replace('samples/', 'samples/noisy/').replace('.wav', '-snr0.wav')]];
+  for (const m of MODELS) {
+    if (!(await modelAvailable(m))) { rows.push({ model: m.label, missing: true }); continue; }
+    out.innerHTML = `<p>Testing ${esc(m.label)}…</p>`;
+    if (modelId === m.id) { model.terminate(); model = null; modelId = null; } // reload, so the load time is measured
+    if (!(await loadModel(m.id))) { rows.push({ model: m.label, missing: true }); continue; }
+    const row = { model: m.label, load: modelLoadMs / 1000, cond: {} };
+    for (const [name, pick] of conditions) {
+      const r = { wer: 0, caught: 0, expected: 0, falseMarks: 0, rtf: 0, n: 0, refused: 0 };
+      for (const s of SAMPLES) {
+        out.innerHTML = `<p>Testing ${esc(m.label)}: ${esc(s.label)}, ${name}…</p>`;
+        const x = await runCase(s, pick(s));
+        r.wer += x.wer; r.caught += x.caught; r.expected += x.expected; r.falseMarks += x.falseMarks; r.rtf += x.rtf; r.n++; if (x.refused) r.refused++;
+      }
+      row.cond[name] = { wer: r.wer / r.n, caught: r.caught, expected: r.expected, falseMarks: r.falseMarks, rtf: r.rtf / r.n, refused: r.refused, n: r.n };
+    }
+    rows.push(row);
+  }
+  window.__bench = rows;
+  const pct = v => `${Math.round(v * 100)}%`;
+  out.innerHTML = '<table><tr><th>Model</th><th>Condition</th><th>Word errors</th><th>Mistakes caught</th><th>False marks</th><th>Not scored (too noisy)</th><th>Speed</th></tr>' +
+    rows.map(r => r.missing ? `<tr><td>${esc(r.model)}</td><td colspan="6">Not on this server</td></tr>`
+      : Object.entries(r.cond).map(([c, v], k) => `<tr><td>${k ? '' : `${esc(r.model)}<br><small>loads in ${r.load.toFixed(1)} s</small>`}</td><td>${c}</td><td>${pct(v.wer)}</td><td>${v.caught} of ${v.expected}</td><td>${v.falseMarks}</td><td>${v.refused} of ${v.n}</td><td>${v.rtf.toFixed(2)}× real time</td></tr>`).join('')).join('') +
+    '</table><p>Word errors: open-listening pass against what was actually said. Mistakes caught: planted mistakes the scoring found. False marks: mistakes reported that weren\'t there. Not scored: recordings the tool refused as too noisy or too quiet (it asks for a re-record instead of guessing).</p>';
+  await loadModel(keep); $('modelSelect').value = keep;
+  btn.disabled = false;
+}
+
+(async () => {
+  for (const m of MODELS) {
+    const ok = await modelAvailable(m);
+    const opt = new Option(m.label + (ok ? '' : ' (not on this server)'), m.id); opt.disabled = !ok;
+    $('modelSelect').add(opt);
+  }
+  const saved = store.get('rc-model', DEFAULT_MODEL);
+  const first = [...$('modelSelect').options].find(o => o.value === saved && !o.disabled) ? saved : DEFAULT_MODEL;
+  $('modelSelect').value = first;
+  $('modelSelect').onchange = async () => { store.set('rc-model', $('modelSelect').value); current = null; renderPassage(); await loadModel($('modelSelect').value); };
+  $('benchRun').onclick = compareModels;
+  await loadModel(first);
 })();
 </script>
 </body>
