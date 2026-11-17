@@ -54,9 +54,9 @@
       <div class="samples" id="samples"></div>
       <label class="listener">Listener
         <select id="listener">
-          <option value="tiny">Better · downloads about 40 MB once</option>
-          <option value="base">Most accurate · about 75 MB once, slower</option>
-          <option value="off">Offline only · no download</option>
+          <option value="tiny">Better (recommended)</option>
+          <option value="base">Most accurate (slower)</option>
+          <option value="off">Offline only</option>
         </select>
       </label>
     </section>
@@ -210,7 +210,7 @@ async function listenAgain(heard) {
   heard.heardBy = 'vosk';
   if (!window.Whisper || !Whisper.enabled() || !heard.playUrl) return heard;
   setMic('busy', Whisper.ready ? 'Listening to your answer again, more carefully…' : 'Getting the better listener ready…');
-  const w = await Whisper.transcribe(heard.playUrl, f => setMic('busy', `Downloading the better listener (once): ${Math.round(f * 100)}%`));
+  const w = await Whisper.transcribe(heard.playUrl, f => setMic('busy', `Getting the better listener ready… ${Math.round(f * 100)}%`));
   if (!w || !w.words.length) return heard;
   return { ...heard, words: w.words, voskWords: heard.words, heardBy: 'whisper', model: w.model };
 }
@@ -230,7 +230,7 @@ function writeSaid(heard, cov) {
   }
   $('said').innerHTML = words.map((w, i) => FILLERS.has(w) ? `<span class="f">${esc(w)}</span>` : mark[i] ? `<span class="kp">${esc(w)}</span>` : esc(w)).join(' ');
   $('saidFoot').hidden = false;
-  $('heardBy').textContent = heard.heardBy === 'whisper' ? 'Heard by the better listener (Whisper, on this device).' : 'Heard by the offline listener.';
+  $('heardBy').textContent = heard.heardBy === 'whisper' ? 'Heard by the better listener.' : 'Heard by the offline listener.';
   $('playMine').hidden = !heard.playUrl;
 }
 $('playMine').onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };

@@ -534,10 +534,10 @@
     <div class="field">
       <label for="passageText">Passage text</label>
       <textarea id="passageText"></textarea>
-      <p>Edit to try your own passage. Write numbers as words ("twenty", not "20").</p>
+      <p>Edit to try your own passage.</p>
     </div>
 
-    <div class="field">
+    <div class="field dev-only" hidden>
       <label for="modelSelect">Speech model</label>
       <select id="modelSelect"></select>
       <p>Runs on this device. Bigger models are more accurate but slower to download and load.</p>
@@ -546,7 +546,7 @@
       <div id="benchOut" class="engine"></div>
     </div>
 
-    <div class="field">
+    <div class="field dev-only" hidden>
       <label for="mode">Listening mode</label>
       <select id="mode">
         <option value="sentences">Passage sentences + words (best in tests)</option>
@@ -559,7 +559,7 @@
     <div class="field">
       <span class="lbl">Check a sample recording</span>
       <label class="followalong"><input type="checkbox" id="realtime" checked> Play aloud and follow along (real time)</label>
-      <p>Off: checks the recording instantly without playing it, which shows how fast the engine is.</p>
+      <p>Off: checks the recording instantly without playing it.</p>
       <div class="samples" id="samples"></div>
     </div>
 
@@ -575,7 +575,7 @@
       <p>Each review keeps the tool's marks next to the teacher's, so the scoring can be tuned. Recordings are not saved.</p>
     </div>
 
-    <div class="field engine">
+    <div class="field engine dev-only" hidden>
       <span class="lbl">Engine details</span>
       <div id="engineInfo"><p>No reading checked yet.</p></div>
     </div>
@@ -1385,6 +1385,8 @@ $('nextPassage').onclick = () => {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 $('modePractice').onclick = () => setAppMode('practice');
+// speech-model settings and engine details are for developers only: add ?dev=1 to the address to see them
+if (new URLSearchParams(location.search).has('dev')) document.querySelectorAll('.dev-only').forEach(el => (el.hidden = false));
 $('modeTest').onclick = () => setAppMode('test');
 setAppMode(appMode === 'test' ? 'test' : 'practice');
 updateReviewCount();
@@ -1420,7 +1422,7 @@ async function loadModel(id) {
   const m = MODELS.find(x => x.id === id) || MODELS[0];
   if (model && modelId === m.id) return true;
   if (model) { try { model.terminate(); if (model.worker) model.worker.terminate(); } catch (e) {} model = null; }
-  setMic('disabled', `Loading the speech model (${m.label})…`);
+  setMic('disabled', 'Getting the listener ready…');
   const t0 = performance.now();
   try {
     model = await Vosk.createModel(m.url);
@@ -1429,7 +1431,7 @@ async function loadModel(id) {
     return true;
   } catch (e) {
     console.error(e); model = null; modelId = null;
-    setMic('disabled', 'The listener could not load. Open this page through the test server, not as a file.', true);
+    setMic('disabled', 'The listener could not load. Open this page through the web server, not as a file.', true);
     return false;
   }
 }
