@@ -55,6 +55,11 @@
   button, select, label { touch-action: manipulation; }
   :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
+  /* activity switcher (same as css/answer.css) */
+  .activities { display: flex; justify-content: center; gap: 4px; padding: 8px var(--gutter) 0; }
+  .activities a { text-decoration: none; color: var(--muted); font-weight: 600; font-size: 0.9375rem; padding: 6px 14px; border-radius: 99px; }
+  .activities a[aria-current="page"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+
   /* top bar */
   .bar { max-width: var(--max); margin: 0 auto; padding: var(--bar-top) var(--gutter) 4px; display: flex; gap: 10px; align-items: center; }
   .picker { display: flex; align-items: center; flex: 1; min-width: 0; }
@@ -364,6 +369,11 @@
 </style>
 </head>
 <body>
+<nav class="activities" aria-label="Activity">
+  <a href="index.html" aria-current="page">Read aloud</a>
+  <a href="write.html">Write</a>
+  <a href="speak.html">Speak</a>
+</nav>
 <header class="bar">
   <div class="picker">
     <select id="passageSelect" aria-label="Choose a passage"></select>

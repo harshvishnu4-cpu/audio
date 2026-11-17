@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Write an Answer</title>
+<link rel="stylesheet" href="css/answer.css?v=1">
+</head>
+<body>
+<nav class="activities" aria-label="Activity">
+  <a href="index.html">Read aloud</a>
+  <a href="write.html" aria-current="page">Write</a>
+  <a href="speak.html">Speak</a>
+</nav>
+<header class="bar">
+  <select id="taskSelect" aria-label="Choose a writing task"></select>
+</header>
+
+<main>
+  <section class="sheet" aria-labelledby="taskTitle">
+    <h2 id="taskTitle"></h2>
+    <p class="prompt" id="prompt"></p>
+    <p class="meta" id="lengthHint"></p>
+    <div class="passage" id="passage" hidden></div>
+    <p class="meta" style="margin-top:12px">Try to include:</p>
+    <ul class="points" id="points"></ul>
+  </section>
+
+  <section class="sheet" aria-labelledby="answerLabel">
+    <label id="answerLabel" for="answer"><b>Your answer</b></label>
+    <textarea id="answer" class="answer" spellcheck="true" autocorrect="off" autocapitalize="off" placeholder="Type your answer here…"></textarea>
+    <div class="row">
+      <span class="count" id="count"><b>0</b> words</span>
+      <button type="button" class="primary" id="check" disabled>Check my answer</button>
+      <span class="meta" id="status"></span>
+    </div>
+  </section>
+
+  <section class="sheet" id="result" hidden aria-live="polite"></section>
+</main>
+
+<script src="js/tasks.js?v=1"></script>
+<script src="js/answer-scoring.js?v=1"></script>
+<script src="js/answer-ui.js?v=1"></script>
+<script>
+const $ = id => document.getElementById(id);
+const { esc } = AnswerUI;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+let task = null, checking = 0;
+
+AnswerTasks.WRITE.forEach(t => $('taskSelect').add(new Option(t.title, t.id)));
+function showTask(id) {
+  task = AnswerTasks.byId(id) || AnswerTasks.WRITE[0];
+  $('taskSelect').value = task.id; store.set('rc-write-task', task.id);
+  $('taskTitle').textContent = task.title;
+  $('prompt').textContent = task.prompt;
+  $('lengthHint').textContent = `Write ${task.minWords}–${task.maxWords} words.`;
+  $('passage').hidden = !task.passage; $('passage').textContent = task.passage || '';
+  $('points').innerHTML = task.keyPoints.map(k => `<li>${esc(k.label)}</li>`).join('');
+  $('answer').value = store.get('rc-write-draft-' + task.id, '');
+  $('result').hidden = true; $('status').textContent = '';
+  updateCount();
+}
+function updateCount() {
+  const n = AnswerScore.tokens($('answer').value).length;
+  $('count').innerHTML = `<b>${n}</b> word${n === 1 ? '' : 's'} <span>(aim ${task.minWords}–${task.maxWords})</span>`;
+  $('count').className = 'count ' + (n >= task.minWords && n <= task.maxWords ? 'ok' : n ? 'off' : '');
+  $('check').disabled = n < 5;
+}
+$('taskSelect').onchange = () => showTask($('taskSelect').value);
+$('answer').addEventListener('input', () => { store.set('rc-write-draft-' + task.id, $('answer').value); updateCount(); });
+
+async function check() {
+  const text = $('answer').value, id = ++checking, t = task;
+  // 1. instant feedback on the device
+  const device = AnswerScore.evaluateWritten(t, text);
+  const draw = (r, note) => AnswerUI.renderFeedback($('result'), r, { original: text, aiNote: note, modelAnswer: t.model, onRetry: () => { $('answer').focus(); $('result').hidden = true; } });
+  draw(device, navigator.onLine === false ? AnswerUI.reasonText('offline') : 'Getting detailed feedback from the AI…');
+  $('result').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  // 2. detailed feedback from the AI when online; replaces the device marks for what it can judge
+  $('status').textContent = '';
+  const { data, reason } = await AnswerUI.askAI({ taskId: t.id, answer: text });
+  if (id !== checking) return; // a newer check started
+  if (data) draw(AnswerScore.mergeAI(device, data), null);
+  else draw(device, AnswerUI.reasonText(reason));
+  window.__lastWrite = { device, data, reason };
+}
+$('check').onclick = check;
+showTask(store.get('rc-write-task', AnswerTasks.WRITE[0].id));
+</script>
+</body>
+</html>

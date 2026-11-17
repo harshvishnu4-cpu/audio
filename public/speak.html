@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Speak an Answer</title>
+<link rel="stylesheet" href="css/answer.css?v=1">
+</head>
+<body>
+<nav class="activities" aria-label="Activity">
+  <a href="index.html">Read aloud</a>
+  <a href="write.html">Write</a>
+  <a href="speak.html" aria-current="page">Speak</a>
+</nav>
+<header class="bar">
+  <select id="taskSelect" aria-label="Choose a speaking task"></select>
+</header>
+
+<main>
+  <section class="sheet" aria-labelledby="taskTitle">
+    <h2 id="taskTitle"></h2>
+    <p class="prompt" id="prompt"></p>
+    <p class="meta" id="lengthHint"></p>
+    <p class="meta" style="margin-top:12px">Try to talk about:</p>
+    <ul class="points" id="points"></ul>
+  </section>
+
+  <section class="sheet recorder" aria-live="polite">
+    <div class="timer" id="timer">0:00</div>
+    <button id="mic" class="mic" type="button" disabled aria-label="Start speaking">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="micIcon"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+    </button>
+    <div class="mic-label" id="micLabel">Getting the listener ready…</div>
+    <p class="live" id="live"></p>
+    <div class="samples" id="samples"></div>
+  </section>
+
+  <section class="sheet" id="result" hidden></section>
+</main>
+<audio id="playback" preload="auto"></audio>
+
+<script src="lib/vosk.js"></script>
+<script src="js/tasks.js?v=1"></script>
+<script src="js/answer-scoring.js?v=1"></script>
+<script src="js/answer-ui.js?v=1"></script>
+<script src="js/speech.js?v=1"></script>
+<script>
+const $ = id => document.getElementById(id);
+const { esc } = AnswerUI;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+// Sample answers (macOS "Aman" Indian English voice) to try the page without speaking.
+const SAMPLES = [
+  { task: 's-intro-job', file: 'samples/s-intro.wav', label: 'Sample: job introduction (with “myself” and fillers)' },
+  { task: 's-weekend', file: 'samples/s-weekend.wav', label: 'Sample: weekend (with present-tense slips)' },
+];
+let task = null, live = null, timerId = 0, startedAt = 0, checking = 0;
+
+AnswerTasks.SPEAK.forEach(t => $('taskSelect').add(new Option(t.title, t.id)));
+function showTask(id) {
+  task = AnswerTasks.byId(id) || AnswerTasks.SPEAK[0];
+  $('taskSelect').value = task.id; store.set('rc-speak-task', task.id);
+  $('taskTitle').textContent = task.title;
+  $('prompt').textContent = task.prompt;
+  $('lengthHint').textContent = `Speak for ${task.minSec}–${task.maxSec} seconds.`;
+  $('points').innerHTML = task.keyPoints.map(k => `<li>${esc(k.label)}</li>`).join('');
+  $('result').hidden = true; $('live').textContent = ''; $('timer').textContent = '0:00';
+  $('samples').innerHTML = '';
+  for (const s of SAMPLES.filter(s => s.task === task.id)) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = s.label;
+    b.onclick = () => runSample(s); $('samples').append(b);
+  }
+}
+$('taskSelect').onchange = () => { if (!live) showTask($('taskSelect').value); };
+
+function setMic(state, label, err) {
+  $('mic').classList.toggle('recording', state === 'recording');
+  $('mic').disabled = state === 'busy' || state === 'disabled';
+  $('mic').setAttribute('aria-label', state === 'recording' ? 'Stop' : 'Start speaking');
+  $('micIcon').innerHTML = state === 'recording' ? '<rect x="6" y="6" width="12" height="12" rx="2"/>'
+    : '<path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/>';
+  $('micLabel').textContent = label; $('micLabel').classList.toggle('err', !!err);
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function tick() {
+  const s = (performance.now() - startedAt) / 1000;
+  $('timer').textContent = fmt(s);
+  if (s > task.maxSec + 15) stopListening(); // stop automatically well past the target time
+}
+
+async function startListening() {
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } }); }
+  catch (e) { setMic('idle', 'The microphone is blocked. Allow microphone access for this page, then tap again.', true); return; }
+  $('result').hidden = true; $('live').textContent = '';
+  live = await Speech.listen({ stream, onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)), onPartial: t => ($('live').textContent = t.split(' ').slice(-12).join(' ')) });
+  startedAt = performance.now(); timerId = setInterval(tick, 250);
+  setMic('recording', 'Listening… tap to stop when you finish');
+}
+async function stopListening() {
+  const l = live; if (!l) return; live = null; clearInterval(timerId);
+  setMic('busy', 'Checking your answer…');
+  const heard = await l.stop();
+  await show(heard);
+}
+async function runSample(s) {
+  if (live) return;
+  setMic('busy', 'Checking the sample answer…');
+  $('result').hidden = true;
+  const heard = await Speech.checkFile(s.file);
+  await show(heard);
+}
+
+async function show(heard) {
+  const t = task, id = ++checking;
+  const device = AnswerScore.evaluateSpoken(t, heard.words, { silences: heard.silences, durationSec: heard.durationSec, snrDb: heard.snrDb });
+  setMic('idle', 'Tap to try again');
+  $('live').textContent = '';
+  $('playback').src = heard.playUrl || '';
+  if (device.refused) {
+    $('result').innerHTML = `<p class="notice">${device.refused === 'noisy' ? 'It was too noisy to check your answer. Move somewhere quieter, hold the tablet a little closer, and try again.' : 'I could not hear enough. Hold the tablet closer, speak a little louder, and try again.'}</p>`;
+    $('result').hidden = false; return;
+  }
+  const s = device.stats;
+  const fillerSet = new Set(['um', 'umm', 'uh', 'uhh', 'er', 'erm', 'ah', 'hmm', 'mm', 'matlab', 'yaani', 'accha', 'haan']);
+  const transcriptHTML = heard.words.filter(w => w.word !== '[unk]').map(w => fillerSet.has(w.word) ? `<span class="f">${esc(w.word)}</span>` : esc(w.word)).join(' ');
+  const extra = `
+    <div class="stats">
+      <div class="stat"><b>${fmt(s.speechSec)}</b><span>speaking time (aim ${t.minSec}–${t.maxSec} s)</span></div>
+      <div class="stat"><b>${s.wpm}</b><span>words a minute</span></div>
+      <div class="stat"><b>${s.fillers}</b><span>filler words</span></div>
+      <div class="stat"><b>${s.longPauses}</b><span>long pauses</span></div>
+    </div>
+    <h3>What the device heard</h3>
+    <p class="transcript">${transcriptHTML || '(nothing)'}</p>
+    <p class="meta">Filler words are marked. The device can mishear some words, especially names.</p>
+    ${heard.playUrl ? '<div class="next"><button type="button" class="ghost" id="playMine">Hear my answer</button></div>' : ''}`;
+  const draw = (r, note) => {
+    AnswerUI.renderFeedback($('result'), r, { original: device.transcript, aiNote: note, modelAnswer: t.model, extraHTML: extra,
+      onRetry: () => { $('result').hidden = true; window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+    const pm = $('playMine'); if (pm) pm.onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };
+  };
+  draw(device, navigator.onLine === false ? AnswerUI.reasonText('offline') : 'Getting detailed feedback from the AI…');
+  // only the words go to the AI (never the audio); fillers removed, since fluency is measured here
+  const words = heard.words.filter(w => w.word !== '[unk]' && !fillerSet.has(w.word)).map(w => w.word).join(' ');
+  const { data, reason } = await AnswerUI.askAI({ taskId: t.id, answer: words, metrics: { speechSec: s.speechSec, wpm: s.wpm } });
+  if (id !== checking) return;
+  if (data) draw(AnswerScore.mergeAI(device, data), null);
+  else draw(device, AnswerUI.reasonText(reason));
+  window.__lastSpeak = { device, data, reason, heard };
+}
+
+$('mic').onclick = () => (live ? stopListening() : startListening());
+showTask(store.get('rc-speak-task', AnswerTasks.SPEAK[0].id));
+(async () => {
+  const ok = await Speech.load();
+  setMic(ok ? 'idle' : 'disabled', ok ? 'Tap the microphone and answer the question' : 'The listener could not load. Open this page through the server, not as a file.', !ok);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "reading-check",
+  "private": true,
+  "description": "Offline reading, writing and speaking practice with optional AI feedback",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

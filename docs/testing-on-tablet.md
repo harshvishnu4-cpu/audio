@@ -117,3 +117,34 @@ What we learned:
     - Between 13.5 and 24 dB it still scores, but doesn't mark small-word slips or dropped endings that only one listening pass heard. False marks at 10 dB fell from 35 to 14. The cost is that it caught 5 of 10 planted mistakes instead of 7.
 - **Thresholds are placeholders.** The 13.5 and 24 dB cut-offs are tuned on synthetic noise. Re-tune them from real classroom recordings; they are in `CONFIG` in `public/js/scoring.js`.
 - **The US small model isn't in git** (it sits in `public/models/candidates/`), so it isn't on Vercel. Copy it onto the server or into the app to test it on a tablet.
+
+## Write and Speak activities
+
+Two activities sit next to the reading tool (switch at the top of the page).
+
+- **Write:** typed emails, summaries, opinions and replies.
+- **Speak:** spoken self-introductions and answers to questions.
+
+Each gives instant feedback on the device, then adds AI feedback when online, if `ANTHROPIC_API_KEY` is set on Vercel (see the README).
+
+**What the device check does well:**
+
+- finding which key points are covered;
+- length or speaking time;
+- common Indian-English learner slips, with fixes ("inform that", "on next Friday", "pending works", "Myself Arjun", "I go" for a past event);
+- format parts (greeting, closing, subject line);
+- copying from the passage;
+- informal words in formal writing;
+- speaking pace and long pauses.
+
+**What it can't do, and why the AI matters:**
+
+- Judge meaning, relevance and quality beyond keywords.
+- Catch most grammar errors (it knows about 20 common slips).
+- Hear names: the small on-device model misheard "Arjun Kumar from Lucknow" in our sample.
+- Count "um" and "uh": the on-device model doesn't write them out, so filler counts mostly come from Hindi fillers ("matlab", "accha") and only when the model hears them.
+
+**Not tested yet:**
+
+- **The live AI call:** no API key was available while building. The server function was tested up to the API (a fake key was correctly rejected as unauthenticated), and the feedback display was tested with a simulated AI reply.
+- **Real learners' free speech on the tablet.** The two sample answers are synthetic.
