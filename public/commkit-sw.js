@@ -8,7 +8,7 @@
     copy is used when offline.
   • Change VERSION to clear old copies.
 */
-const VERSION = 'commkit-v3';
+const VERSION = 'commkit-v4';
 // small files kept from the start; the 37 MB speech model is saved the first time a page loads it
 const CORE = ['kit/commkit.js', 'lib/vosk.js', 'js/scoring.js', 'js/answer-scoring.js'];
 
@@ -26,7 +26,14 @@ self.addEventListener('message', e => {
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin || req.headers.has('range')) return;
+  if (req.method !== 'GET' || req.headers.has('range')) return;
+  // the better listener's code (transformers.js and its speech runtime) comes from a CDN at fixed versions:
+  // keep it, so Whisper also works offline after its first use (the model itself is kept by transformers.js)
+  if (new URL(req.url).origin === 'https://cdn.jsdelivr.net' && /\/npm\/(@huggingface\/transformers|onnxruntime-web)@\d/.test(req.url)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return res; })));
+    return;
+  }
+  if (new URL(req.url).origin !== location.origin) return;
   if (new URL(req.url).pathname.startsWith('/api/')) return; // the AI feedback is online-only
   const path = new URL(req.url).pathname;
   const big = /\.(tar\.gz|wasm|wav|mp3|ogg|m4a|png|jpe?g|webp|svg|woff2?)$/i.test(path) || path.endsWith('/lib/vosk.js');

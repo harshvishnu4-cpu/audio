@@ -31,7 +31,7 @@
   };
   const url = p => new URL(p, ROOT).href;
   // scripts carry the kit version, so a browser never keeps an old scorer after an update (bump VERSION when they change)
-  const VERSION = '1.1.0';
+  const VERSION = '1.1.1';
   const scriptUrl = p => url(p) + (p.includes('?') ? '&' : '?') + 'v=' + VERSION;
   const scripts = {};
   const loadScript = (p, global) => window[global] ? Promise.resolve() : (scripts[p] = scripts[p] || new Promise((res, rej) => {
@@ -185,6 +185,8 @@
       // by the read-aloud scoring rules: errors, minor errors (weigh less), unclear words that count, and notes that never lower the score
       counts: { errors: a.counts.errors, minor: a.counts.minor, unclear: a.counts.unclearCounted, errorCost: a.counts.errorCost }, notes: a.notes,
       tooNoisy: a.tooNoisy, heardTooLittle: a.heardTooLittle, recording: raw.recording, analysis: a,
+      // what the engine heard: the passage pass (listens for the passage's words) and the open pass (any English word)
+      heard: { passage: raw.passes[0].map(w => w.word).join(' '), open: (raw.passes[1] || []).map(w => w.word).join(' ') },
     };
   }
 

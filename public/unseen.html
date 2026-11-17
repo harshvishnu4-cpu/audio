@@ -42,6 +42,7 @@
   .legend .l-change::before { border-bottom: 2px solid var(--fix); }
   .legend .l-minor::before { border-bottom: 2px solid #d1a33c; }
   .legend .l-unclear::before { border-bottom: 2px dotted #7d8799; }
+  .legend .l-added::before { display: none; }
 
   /* recorder */
   .rec .eyebrow { text-align: center; }
@@ -54,6 +55,15 @@
   .quiz legend { font-weight: 650; margin-bottom: 8px; }
   .quiz label { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; }
   .quiz label.right { background: var(--mint); border-color: transparent; } .quiz label.wrong { background: var(--fix-soft); border-color: transparent; }
+  .testing { width: 100%; border-top: 1px solid var(--line); padding-top: 10px; text-align: left; }
+  .testing summary { cursor: pointer; font-weight: 600; font-size: .875rem; color: var(--accent); }
+  .t-body { display: grid; gap: 8px; margin-top: 10px; justify-items: start; }
+  .t-body .btn { padding: 8px 14px; font-size: .875rem; }
+  .filebtn { cursor: pointer; display: inline-block; }
+  .t-check { display: flex; gap: 8px; align-items: center; font-size: .875rem; }
+  .t-note { margin: 0; font-size: .75rem; color: var(--muted); }
+  .heard-box { margin: 0; padding: 12px 14px; background: var(--soft-2); border-radius: var(--r-md); font-family: ui-monospace, Menlo, monospace; font-size: .8125rem; white-space: pre-wrap; }
+  .text .w.here { background: #fde68a; box-shadow: 0 0 0 3px #fde68a; } .text .w.done { color: var(--ink); }
   .first { display: inline-flex; gap: 6px; align-items: center; font-size: .8125rem; font-weight: 700; border-radius: 99px; padding: 3px 10px; background: var(--mint); color: var(--mint-ink); }
   .first.practice { background: var(--soft); color: var(--muted); }
 </style>
@@ -100,7 +110,17 @@
         <li>Read at your normal speed. It stops by itself after the last word.</li>
         <li>If you make a mistake, just correct it and carry on.</li>
       </ul>
-      <button class="link-btn" id="sample" type="button" hidden>Try a sample recording</button>
+      <details class="testing" id="testing">
+        <summary>Testing tools</summary>
+        <div class="t-body">
+          <button class="btn secondary" id="sample" type="button">Try a sample recording</button>
+          <label class="btn secondary filebtn">Check an audio file<input type="file" id="file" accept="audio/*" hidden></label>
+          <label class="t-check"><input type="checkbox" id="highlight"> Highlight words as I read</label>
+          <label class="t-check"><input type="checkbox" id="debug"> Show what the listener heard</label>
+          <button class="link-btn" id="reset" type="button">Reset my unseen scores</button>
+          <p class="t-note">For teachers and testing. A recording or file is checked exactly like a live reading.</p>
+        </div>
+      </details>
     </section>
   </div>
 
@@ -117,8 +137,8 @@
 </div>
 
 <script src="js/tasks.js?v=1"></script>
-<script src="js/course.js?v=3"></script>
-<script src="kit/commkit.js?v=1.1.0"></script>
+<script src="js/course.js?v=4"></script>
+<script src="kit/commkit.js?v=1.1.1"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -188,7 +208,8 @@ function show(id) {
   $('results').hidden = true; $('actionbar').hidden = true;
   $('clock').textContent = '0:00'; $('readBar').style.width = '0%';
   $('recTitle').textContent = 'Get ready'; $('tips').hidden = false;
-  $('sample').hidden = !(new URLSearchParams(location.search).has('sample') && SAMPLES[item.id]);
+  $('sample').hidden = !SAMPLES[item.id];
+  if (new URLSearchParams(location.search).has('sample')) $('testing').open = true;
   setMic('idle', seen ? 'Tap to read it again (practice)' : 'Tap to start reading');
   setStep('ready'); renderLessons();
 }
@@ -211,7 +232,10 @@ async function start(audio) {
   setStep('read');
   const total = item.text.split(/\s+/).length;
   reading = CommKit.readAloud({ text: item.text, audio, maxSeconds: 240,
-    onProgress: (i, n) => { $('readBar').style.width = `${Math.round(((i + 1) / n) * 100)}%`; },
+    onProgress: (i, n) => {
+      $('readBar').style.width = `${Math.round(((i + 1) / n) * 100)}%`;
+      if ($('highlight').checked) [...$('text').querySelectorAll('.w')].filter(s => s.textContent.replace(/[^A-Za-z0-9]/g, '')).forEach((s, k) => { s.classList.toggle('done', k < i); s.classList.toggle('here', k === i); });
+    },
     onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)) });
   if (!audio) {
     startedAt = performance.now();
@@ -285,9 +309,13 @@ function results(r) {
     </div>
     <section class="card">
       <h2>Listen</h2>
-      <div class="legend"><span>skipped</span><span class="l-change">changed</span><span class="l-minor">minor slip</span><span class="l-unclear">hard to understand</span><span style="--x:0">^ added word</span></div>
+      <div class="legend"><span>skipped</span><span class="l-change">changed</span><span class="l-minor">minor slip</span><span class="l-unclear">hard to understand</span><span class="l-added">^ added word</span></div>
       ${r.recording ? `<p style="margin:14px 0 0; display:flex; gap:10px; flex-wrap:wrap"><button class="btn secondary" id="play" type="button">▶ Hear your reading</button><button class="btn secondary" id="saveRec" type="button">Save the recording</button></p>` : ''}
     </section>
+    ${$('debug').checked ? `<section class="card"><h2>What the listener heard</h2>
+      <p class="eyebrow">Passage pass (listens for the passage's words)</p><p class="heard-box">${esc(r.heard.passage) || '(nothing)'}</p>
+      <p class="eyebrow" style="margin-top:10px">Open pass (any English word)</p><p class="heard-box">${esc(r.heard.open) || '(nothing)'}</p>
+      <p class="ai-note">Accuracy ${r.accuracy}% · ${r.wcpm} words a minute · recording quality ${esc(a.quality)}${a.snrDb !== null ? ` (${a.snrDb} dB)` : ''}.</p></section>` : ''}
     <section class="card quiz">
       <h2>Did you understand?</h2>
       <form id="quiz">${item.questions.map((q, k) => `<fieldset><legend>${k + 1}. ${esc(q.q)}</legend>${q.options.map((o, j) => `<label><input type="radio" name="q${k}" value="${j}"> ${esc(o)}</label>`).join('')}</fieldset>`).join('')}
@@ -333,6 +361,13 @@ function AnswerRing(total, max) {
 }
 
 $('mic').onclick = () => (reading ? finish() : start());
+// testing tools: options are remembered on this device
+for (const id of ['highlight', 'debug']) {
+  $(id).checked = store.get('rc-unseen-' + id, false);
+  $(id).onchange = () => store.set('rc-unseen-' + id, $(id).checked);
+}
+$('file').onchange = () => { const f = $('file').files[0]; if (f && !reading) start(URL.createObjectURL(f)); $('file').value = ''; };
+$('reset').onclick = () => { if (confirm('Clear all unseen passage scores on this device?')) { store.set('rc-unseen', {}); show(LIST[0].id); } };
 $('sample').onclick = () => start(SAMPLES[item.id]);
 $('again').onclick = () => { show(item.id); scrollTo({ top: 0, behavior: 'smooth' }); };
 $('next').onclick = () => {

@@ -6,6 +6,10 @@
 <title>Speaking Practice</title>
 <link rel="stylesheet" href="css/base.css?v=4">
 <link rel="stylesheet" href="css/course.css?v=3">
+<style>
+  .listener { display: flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--muted); flex-wrap: wrap; justify-content: center; }
+  .listener select { font: inherit; font-size: .8125rem; border: 1px solid var(--line); border-radius: 99px; padding: 5px 10px; background: #fff; color: var(--text); max-width: 100%; }
+</style>
 </head>
 <body data-kind="speak">
 <header class="topbar" id="topbar"></header>
@@ -48,6 +52,13 @@
       </button>
       <p class="mic-label" id="micLabel">Getting the listener ready…</p>
       <div class="samples" id="samples"></div>
+      <label class="listener">Listener
+        <select id="listener">
+          <option value="tiny">Better · downloads about 40 MB once</option>
+          <option value="base">Most accurate · about 75 MB once, slower</option>
+          <option value="off">Offline only · no download</option>
+        </select>
+      </label>
     </section>
   </div>
 
@@ -55,7 +66,7 @@
     <p class="paper-title">What you said</p>
     <p class="paper-text ruled said-text" id="said" aria-live="polite" data-empty="Your words will be written here as you speak."></p>
     <div class="paper-foot" id="saidFoot" hidden>
-      <span class="grow">Key points are <span class="said-text"><span class="kp">highlighted</span></span>; filler words are <span class="said-text"><span class="f">underlined</span></span>. The device can mishear some words, especially names.</span>
+      <span class="grow"><span id="heardBy"></span> Key points are <span class="said-text"><span class="kp">highlighted</span></span>; filler words are <span class="said-text"><span class="f">underlined</span></span>. The device can mishear some words, especially names.</span>
       <button type="button" class="link-btn" id="playMine" hidden>▶ Hear my answer</button>
     </div>
   </section>
@@ -75,10 +86,11 @@
 
 <script src="lib/vosk.js"></script>
 <script src="js/tasks.js?v=1"></script>
-<script src="js/course.js?v=3"></script>
+<script src="js/course.js?v=4"></script>
 <script src="js/answer-scoring.js?v=2"></script>
 <script src="js/answer-ui.js?v=3"></script>
 <script src="js/speech.js?v=1"></script>
+<script src="js/whisper.js?v=1"></script>
 <script>
 const $ = id => document.getElementById(id);
 const { esc } = AnswerUI;
@@ -178,18 +190,29 @@ async function startListening() {
   live = await Speech.listen({ stream, onLevel: v => $('mic').style.setProperty('--level', v.toFixed(3)),
     onPartial: t => { $('said').textContent = t; tickChips(t); } });
   startedAt = performance.now(); timerId = setInterval(tick, 250);
+  if (window.Whisper && Whisper.enabled() && navigator.onLine) Whisper.load(); // download while the learner speaks
   setMic('recording', 'Listening… tap to stop when you finish');
 }
 async function stopListening() {
   const l = live; if (!l) return; live = null; clearInterval(timerId);
   setMic('busy', 'Checking your answer…');
-  await show(await l.stop());
+  await show(await listenAgain(await l.stop()));
 }
 async function runSample(s) {
   if (live) return;
   setStep('speak'); setMic('busy', 'Checking the sample answer…');
   $('feedback').hidden = true;
-  await show(await Speech.checkFile(s.file));
+  await show(await listenAgain(await Speech.checkFile(s.file)));
+}
+// The live words come from the offline listener (Vosk), which is quick but often mishears free speech.
+// When it can, the better listener (Whisper, on this device) listens to the recording again and its words are used.
+async function listenAgain(heard) {
+  heard.heardBy = 'vosk';
+  if (!window.Whisper || !Whisper.enabled() || !heard.playUrl) return heard;
+  setMic('busy', Whisper.ready ? 'Listening to your answer again, more carefully…' : 'Getting the better listener ready…');
+  const w = await Whisper.transcribe(heard.playUrl, f => setMic('busy', `Downloading the better listener (once): ${Math.round(f * 100)}%`));
+  if (!w || !w.words.length) return heard;
+  return { ...heard, words: w.words, voskWords: heard.words, heardBy: 'whisper', model: w.model };
 }
 
 // ---------- feedback ----------
@@ -207,6 +230,7 @@ function writeSaid(heard, cov) {
   }
   $('said').innerHTML = words.map((w, i) => FILLERS.has(w) ? `<span class="f">${esc(w)}</span>` : mark[i] ? `<span class="kp">${esc(w)}</span>` : esc(w)).join(' ');
   $('saidFoot').hidden = false;
+  $('heardBy').textContent = heard.heardBy === 'whisper' ? 'Heard by the better listener (Whisper, on this device).' : 'Heard by the offline listener.';
   $('playMine').hidden = !heard.playUrl;
 }
 $('playMine').onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };
@@ -256,6 +280,10 @@ async function show(heard) {
 }
 
 $('mic').onclick = () => (live ? stopListening() : startListening());
+if (window.Whisper) {
+  $('listener').value = Whisper.setting();
+  $('listener').onchange = () => { try { localStorage.setItem('rc-whisper', JSON.stringify($('listener').value)); } catch (e) {} location.reload(); };
+} else $('listener').closest('label').hidden = true;
 $('retry').onclick = () => { $('feedback').hidden = true; $('actionbar').hidden = true; setStep('prep'); tickChips(''); clearSaid(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('next').onclick = () => {
   const list = AnswerTasks.SPEAK, i = list.findIndex(t => t.id === task.id);
