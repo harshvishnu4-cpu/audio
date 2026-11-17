@@ -152,7 +152,7 @@
       .then(reg => {
         // the whole course, so every tab opens offline after one visit (versioned ?v= URLs fall back to these copies)
         const msg = { type: 'cache', urls: ['plan.html', 'index.html', 'write.html', 'speak.html', 'unseen.html', 'kit/commkit.js', 'css/base.css', 'css/course.css',
-          'js/course.js', 'js/tasks.js', 'js/scoring.js', 'js/answer-scoring.js', 'js/answer-ui.js', 'js/speech.js', 'js/whisper.js',
+          'js/course.js', 'js/tasks.js', 'js/scoring.js', 'js/answer-scoring.js', 'js/answer-ui.js', 'js/speech.js', 'js/whisper.js', 'js/motion.js', 'lib/gsap.min.js',
           'lib/vosk.js', 'models/en-in.tar.gz'].map(u => new URL(u, location.href).href) };
         reg.active.postMessage(msg);
         navigator.serviceWorker.addEventListener('controllerchange', () => navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage(msg), { once: true });

@@ -67,6 +67,8 @@
   .first { display: inline-flex; gap: 6px; align-items: center; font-size: .8125rem; font-weight: 700; border-radius: 99px; padding: 3px 10px; background: var(--mint); color: var(--mint-ink); }
   .first.practice { background: var(--soft); color: var(--muted); }
 </style>
+<script src="lib/gsap.min.js" defer></script>
+<script src="js/motion.js?v=1" defer></script>
 </head>
 <body data-kind="read">
 <header class="topbar" id="topbar"></header>
@@ -137,7 +139,7 @@
 </div>
 
 <script src="js/tasks.js?v=1"></script>
-<script src="js/course.js?v=4"></script>
+<script src="js/course.js?v=5"></script>
 <script src="kit/commkit.js?v=1.1.1"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -227,7 +229,8 @@ async function start(audio) {
   setMic('busy', CommKit.isReady ? 'Starting…' : 'Getting the listener ready…');
   if (!(await CommKit.ready())) { setMic('idle', 'The listener could not load. Open this page through the web server, not as a file.', true); return; }
   // reveal the passage and start listening at the same moment
-  $('cover').hidden = true; $('text').classList.remove('blurred'); $('text').removeAttribute('aria-hidden');
+  $('text').classList.remove('blurred'); $('text').removeAttribute('aria-hidden');
+  if (window.Motion) Motion.uncover($('cover'), $('text')); else $('cover').hidden = true;
   $('title').textContent = item.title; $('tips').hidden = true; $('recTitle').textContent = audio ? 'Checking a sample' : 'Reading';
   setStep('read');
   const total = item.text.split(/\s+/).length;

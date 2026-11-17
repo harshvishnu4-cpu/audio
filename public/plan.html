@@ -25,7 +25,7 @@
 
   /* ---------- the path ---------- */
   .path { position: relative; display: grid; gap: 22px; padding-left: 30px; list-style: none; margin: 0; }
-  .path::before { content: ""; position: absolute; left: 9px; top: 24px; bottom: 24px; border-left: 2px dashed var(--path); }
+  .path::before { content: ""; position: absolute; left: 9px; top: 24px; bottom: 24px; border-left: 2px dashed var(--path); transform: scaleY(var(--draw, 1)); transform-origin: top; }
   .node { position: relative; background: var(--card); border-radius: var(--r-xl); box-shadow: var(--shadow); padding: 22px 20px 18px; }
   .node::before { content: ""; position: absolute; top: 40px; left: -26px; width: 12px; height: 12px; border-radius: 50%; background: var(--path); box-shadow: 0 0 0 4px var(--bg); }
   .node.done::before { background: var(--path); }
@@ -93,6 +93,8 @@
   .evt.read { --tone: var(--sky); } .evt.write { --tone: var(--butter); } .evt.speak { --tone: var(--lilac); }
   .node.read { --tone: var(--sky); } .node.write { --tone: var(--butter); } .node.speak { --tone: var(--lilac); }
 </style>
+<script src="lib/gsap.min.js" defer></script>
+<script src="js/motion.js?v=1" defer></script>
 </head>
 <body>
 <header class="topbar" id="topbar"></header>
@@ -123,7 +125,7 @@
 </div>
 
 <script src="js/tasks.js?v=1"></script>
-<script src="js/course.js?v=4"></script>
+<script src="js/course.js?v=5"></script>
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);

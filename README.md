@@ -19,7 +19,8 @@ Written and spoken feedback both use the same six parts: level and score (out of
 |---|---|
 | `public/` | **The website.** Vercel serves this folder as the site root (see `vercel.json`). |
 | `public/css/` | `base.css` is the shared course look for every page (black top bar, panel, pastel lesson cards, steps, paper surfaces, score ring, floating action bar); `course.css` adds the Write and Speak parts |
-| `public/js/` | `course.js` (the reading passages, the learning-plan order, progress and the shared top bar), `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page) |
+| `public/lib/` | `vosk.js` (offline speech engine) and `gsap.min.js` (GSAP 3.13 animations, under GSAP's free standard licence), kept with the app so both work offline |
+| `public/js/` | `course.js` (the reading passages, the learning-plan order, progress and the shared top bar), `scoring.js` (read aloud), `answer-scoring.js` (write and speak, offline), `tasks.js` (the writing and speaking tasks), `answer-ui.js` (feedback display and the AI call), `speech.js` (on-device listening for the Speak page), `motion.js` (the animations: cards arriving, the learning path drawing itself, score rings counting up with confetti for great scores, key points popping, the mic pulsing; nothing moves when the device asks for reduced motion) |
 | `api/evaluate.js` | Vercel server function that asks the AI for feedback. Only the tasks in `tasks.js` can be marked |
 | `tests/` | Unit tests for all the scoring rules and the server function |
 | `public/kit/` | CommKit: `commkit.js`, a demo page, its guide (`README.md`) and two example games |
