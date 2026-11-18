@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Speaking Practice</title>
-<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/base.css?v=9">
 <link rel="stylesheet" href="css/course.css?v=3">
 <style>
   .listener { display: flex; align-items: center; gap: 8px; font-size: .8125rem; color: var(--muted); flex-wrap: wrap; justify-content: center; }
@@ -15,16 +15,17 @@
 </head>
 <body data-kind="speak">
 <header class="topbar" id="topbar"></header>
-<div class="panel">
+<div class="panel"><div class="shell">
+<aside class="tasks" aria-label="Speaking tasks">
+  <div class="tasks-head"><p class="side-title">Speaking tasks</p><div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div></div>
+  <div class="lessons" id="lessons"></div>
+  <p class="tasks-foot">Speech is turned into text on this device. The better listener is used when it has been downloaded.</p>
+</aside>
+<main class="workcol">
 <div class="pagehead">
   <div><p class="crumb">Communication Skills · Speaking</p><h1>Speaking practice</h1></div>
-  <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
 </div>
 
-<main>
-  <section aria-label="Choose a lesson">
-    <div class="lessons" id="lessons"></div>
-  </section>
 
   <ol class="steps" id="steps" aria-label="Steps">
     <li data-step="prep"><span class="n">1</span><span class="lb">Prepare</span></li>
@@ -72,11 +73,13 @@
       <button type="button" class="link-btn" id="playMine" hidden>▶ Hear my answer</button>
     </div>
   </section>
-
-  <section class="fb" id="feedback" hidden aria-live="polite"></section>
+  <details class="typed" id="typedBox"><summary>No microphone? Type what was said</summary><textarea id="typedText" placeholder="Type the answer exactly as it was said"></textarea><div class="row"><button class="btn secondary" id="typedCheck" type="button">Check this answer</button><p class="hint">Speaking time and pace are estimated from the typed words.</p></div></details>
+  <p class="rubric-note"><b>Scored out of 16:</b> content and task, fluency and pace, grammar and vocabulary, and clarity, 4 marks each. An accent is never counted against you.</p>
 </main>
-</div>
-
+<aside class="fbcol" aria-label="Feedback">
+  <div class="fb-head"><h2>Feedback</h2><p>Four criteria, each out of 4.</p></div>
+  <div class="fb-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><p>Record your answer, then press Stop. Your feedback will appear here.</p></div>
+<section class="fb" id="feedback" hidden aria-live="polite"></section>
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
     <span class="grow" id="actionNote"></span>
@@ -84,6 +87,8 @@
     <button type="button" class="btn primary" id="next">Next question</button>
   </div>
 </div>
+</aside>
+</div></div>
 <audio id="playback" preload="auto"></audio>
 
 <script src="lib/vosk.js"></script>
@@ -232,7 +237,7 @@ function writeSaid(heard, cov) {
   }
   $('said').innerHTML = words.map((w, i) => FILLERS.has(w) ? `<span class="f">${esc(w)}</span>` : mark[i] ? `<span class="kp">${esc(w)}</span>` : esc(w)).join(' ');
   $('saidFoot').hidden = false;
-  $('heardBy').textContent = heard.heardBy === 'whisper' ? 'Heard by the better listener.' : 'Heard by the offline listener.';
+  $('heardBy').textContent = heard.heardBy === 'whisper' ? 'Heard by the better listener.' : heard.heardBy === 'typed' ? 'Typed by hand.' : 'Heard by the offline listener.';
   $('playMine').hidden = !heard.playUrl;
 }
 $('playMine').onclick = () => { const a = $('playback'); if (a.paused) { a.currentTime = 0; a.play(); } else a.pause(); };
@@ -282,6 +287,16 @@ async function show(heard) {
 }
 
 $('mic').onclick = () => (live ? stopListening() : startListening());
+// No microphone: score a typed answer the same way (timing is estimated: about 150 words a minute, no long pauses)
+$('typedCheck').onclick = async () => {
+  if (live) return;
+  const ws = $('typedText').value.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, ' ').split(/\s+/).filter(Boolean);
+  if (ws.length < 3) { $('typedText').focus(); return; }
+  let t = 0.3;
+  const words = ws.map(w => { const o = { word: w, conf: 1, start: +t.toFixed(2), end: +(t + 0.32).toFixed(2) }; t += 0.4; return o; });
+  setStep('speak'); setMic('busy', 'Checking the typed answer…');
+  await show({ words, silences: [], durationSec: +(t + 0.3).toFixed(2), snrDb: null, playUrl: null, heardBy: 'typed' });
+};
 if (window.Whisper) {
   $('listener').value = Whisper.setting();
   $('listener').onchange = () => { try { localStorage.setItem('rc-whisper', JSON.stringify($('listener').value)); } catch (e) {} location.reload(); };

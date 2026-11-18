@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Writing Practice</title>
-<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/base.css?v=9">
 <link rel="stylesheet" href="css/course.css?v=3">
 <style>
   /* Write page: the paper is the main thing; the task sits beside it on a tablet, above it on a phone */
@@ -28,14 +28,17 @@
 </head>
 <body data-kind="write">
 <header class="topbar" id="topbar"></header>
-<div class="panel">
+<div class="panel"><div class="shell">
+<aside class="tasks" aria-label="Writing tasks">
+  <div class="tasks-head"><p class="side-title">Writing tasks</p><div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div></div>
+  <div class="lessons" id="lessons"></div>
+  <p class="tasks-foot">Checked on this device. When online, AI feedback can add more detail.</p>
+</aside>
+<main class="workcol">
 <div class="pagehead">
   <div><p class="crumb">Communication Skills · Writing</p><h1>Writing practice</h1></div>
-  <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
 </div>
 
-<main>
-  <section aria-label="Choose a lesson"><div class="lessons" id="lessons"></div></section>
 
   <ol class="steps" id="steps" aria-label="Steps">
     <li data-step="prep"><span class="n">1</span><span class="lb">Prepare</span></li>
@@ -58,11 +61,12 @@
 
     <div class="desk" id="desk"><!-- the writing surface for this task: mail, reply or notebook --></div>
   </div>
-
-  <section class="fb" id="feedback" hidden aria-live="polite"></section>
+  <p class="rubric-note"><b>Scored out of 16:</b> task and content, organisation, grammar, and vocabulary and tone, 4 marks each.</p>
 </main>
-</div>
-
+<aside class="fbcol" aria-label="Feedback">
+  <div class="fb-head"><h2>Feedback</h2><p>Four criteria, each out of 4.</p></div>
+  <div class="fb-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><p>Write your answer, then press Check my answer. Your feedback will appear here.</p></div>
+<section class="fb" id="feedback" hidden aria-live="polite"></section>
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
     <span class="grow" id="actionNote"></span>
@@ -70,6 +74,8 @@
     <button type="button" class="btn primary" id="next">Next task</button>
   </div>
 </div>
+</aside>
+</div></div>
 
 <script src="js/tasks.js?v=1"></script>
 <script src="js/course.js?v=5"></script>

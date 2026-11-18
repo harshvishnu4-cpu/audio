@@ -169,3 +169,70 @@ main > *, .work > * { min-width: 0; } /* let wide children (the lesson row) scro
 /* the big round record button is black like the rest of the controls (recording keeps its own colour) */
 .mic:not(.recording):not(:disabled) { background: var(--frame); box-shadow: 0 0 0 calc(8px + var(--level, 0) * 22px) rgba(0, 0, 0, .08); }
 .link-btn { border: 0; background: none; color: var(--accent); font-weight: 600; font-size: .875rem; cursor: pointer; padding: 4px 6px; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------- three-panel workspace: tasks · the task · feedback (activity pages) ---------- */
+.shell { display: grid; grid-template-columns: minmax(0, 1fr); }
+.shell > * { min-width: 0; }
+.tasks { padding: 18px var(--gutter) 0; }
+.tasks-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.side-title { margin: 0; font-size: .8125rem; font-weight: 700; color: var(--muted); }
+.tasks-foot { display: none; margin: 16px 0 0; font-size: .75rem; line-height: 1.5; color: var(--muted); }
+.shell main.workcol { max-width: none; margin: 0; padding: 20px var(--gutter) 120px; align-content: start; }
+.workcol .pagehead { padding: 0; margin: 0; max-width: none; }
+.workcol .pagehead h1 { font-size: clamp(1.5rem, 1.15rem + 1.4vw, 2rem); }
+.shell .workcol .work { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
+.shell .workcol .work > * { grid-area: auto; }
+.shell .workcol .work > .rec, .shell .workcol .work > .reccard, .shell .workcol .work > .task { position: static; } /* no sticky side cards in one column */
+.instr { background: var(--card); border-radius: var(--r-lg); padding: 14px 18px; box-shadow: var(--shadow); }
+.instr .eyebrow { margin: 0 0 2px; }
+.instr p:last-child { margin: 0; }
+.rubric-note { margin: 0; font-size: .8125rem; color: var(--muted); }
+.rubric-note b { color: var(--text); }
+.typed { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 14px 18px; }
+.typed summary { cursor: pointer; font-weight: 600; }
+.typed textarea { display: block; width: 100%; min-height: 96px; margin: 12px 0 10px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; font-size: 1rem; resize: vertical; }
+.typed .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.typed .hint { margin: 0; font-size: .8125rem; color: var(--muted); }
+.fbcol { padding: 0 var(--gutter) 120px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.fbcol > * { min-width: 0; }
+.fb-head h2 { margin: 0; font-size: 1.375rem; letter-spacing: -.02em; }
+.fb-head p { margin: 2px 0 0; font-size: .875rem; color: var(--muted); }
+.fb-empty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 64px 12px; color: var(--muted); }
+.fb-empty svg { width: 40px; height: 40px; color: #b7bcc7; }
+.fb-empty p { margin: 0; max-width: 30ch; }
+/* phones and portrait tablets: the feedback heading and empty state only appear once there is feedback */
+.fb-head, .fb-empty { display: none; }
+.fbcol:has(> .fb:not([hidden]), > .scorecard-wrap:not([hidden])) .fb-head { display: block; }
+
+@media (min-width: 64em) {
+  .shell { grid-template-columns: 236px minmax(0, 1fr) minmax(330px, 390px); min-height: calc(100vh - 82px); }
+  .tasks { border-right: 1px solid var(--line); padding: 22px 14px; position: sticky; top: 0; align-self: start;
+    height: calc(100vh - 82px); min-height: 420px; overflow-y: auto; display: flex; flex-direction: column; }
+  .tasks-head { display: grid; gap: 8px; padding: 0 6px; }
+  .tasks .progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .tasks .progress .track { width: auto; }
+  .tasks .lessons { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: minmax(0, 1fr); gap: 4px; overflow: visible; padding: 0; scroll-snap-type: none; }
+  .tasks .lesson { grid-template-columns: 34px minmax(0, 1fr); gap: 2px 10px; padding: 9px 10px; border-radius: var(--r-md); background: transparent; box-shadow: none; }
+  .tasks .lesson:hover { background: rgba(255, 255, 255, .7); box-shadow: none; }
+  .tasks .lesson[aria-pressed="true"] { background: var(--tone); }
+  .tasks .lesson .ic { width: 34px; height: 34px; background: var(--card); }
+  .tasks .lesson .ic svg { width: 18px; height: 18px; }
+  .tasks .lesson .nm { font-size: .9375rem; }
+  .tasks .lesson .sub { font-size: .75rem; gap: 6px; }
+  .tasks-foot { display: block; margin-top: auto; padding: 16px 6px 0; }
+  .shell main.workcol { padding: 24px 28px 48px; }
+  .fbcol { border-left: 1px solid var(--line); padding: 24px 22px 24px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; }
+  .fb-head { display: block; }
+  .fb-empty { display: grid; }
+  .fbcol:has(> .fb:not([hidden]), > .scorecard-wrap:not([hidden])) .fb-empty { display: none; }
+  /* feedback cards in one narrow column */
+  .fbcol .two, .fbcol .crits { grid-template-columns: minmax(0, 1fr); }
+  .fbcol .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fbcol .card { padding: 18px; }
+  .fbcol .scorecard { grid-template-columns: auto minmax(0, 1fr); gap: 14px; }
+  /* the action bar sits at the foot of the feedback panel instead of floating */
+  .fbcol .actionbar { position: sticky; left: auto; bottom: 0; transform: none; width: 100%; margin-top: 4px; }
+  .fbcol .actionbar-in { padding: 6px 6px 6px 16px; }
+  .fbcol .actionbar .grow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fbcol .actionbar .btn { padding: 10px 14px; }
+}

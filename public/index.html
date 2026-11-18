@@ -9,7 +9,7 @@
   small model) running inside a WebView is fast and accurate enough to catch skipped / wrong /
   extra words when a learner reads a passage aloud. Not production code.
 -->
-<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/base.css?v=9">
 <style>
   :root {
     --desk: #e9edf3; --paper: #ffffff; --rule: #c9d7ee; --margin: #e6a3a0; --edge: #c3cad6;
@@ -393,11 +393,16 @@
 </head>
 <body data-kind="read">
 <header class="topbar" id="topbar"></header>
-<div class="panel">
+<div class="panel"><div class="shell">
+<aside class="tasks" aria-label="Reading passages">
+  <div class="tasks-head"><p class="side-title">Reading passages</p><div class="progress" aria-label="Your progress"><div class="track"><div class="fill" id="progFill" style="width:0%"></div></div><span id="progText"></span></div></div>
+  <div class="lessons" id="lessons"></div>
+  <p class="tasks-foot">Speech is turned into text on this device. Scoring follows the Read-Aloud Scoring Rules.</p>
+</aside>
+<main class="workcol">
 <div class="pagehead">
   <div><p class="crumb">Communication Skills · Reading</p><h1>Reading practice</h1></div>
   <div class="title-tools">
-    <div class="progress" aria-label="Your progress"><div class="track"><div class="fill" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
     <div class="modes" role="group" aria-label="Practice or test">
       <button type="button" id="modePractice" aria-pressed="true">Practice</button>
       <button type="button" id="modeTest" aria-pressed="false">Test</button>
@@ -407,11 +412,7 @@
   <!-- the passage list the reading logic uses; the lesson cards drive it -->
   <select id="passageSelect" class="sr-only" aria-hidden="true" tabindex="-1"></select>
 </div>
-
-<main>
-  <section aria-label="Choose a passage"><div class="lessons" id="lessons"></div></section>
-
-  <ol class="steps" id="steps" aria-label="Steps">
+<ol class="steps" id="steps" aria-label="Steps">
     <li data-step="prep"><span class="n">1</span><span class="lb">Prepare</span></li>
     <li data-step="read"><span class="n">2</span><span class="lb">Read aloud</span></li>
     <li data-step="feedback"><span class="n">3</span><span class="lb">Feedback</span></li>
@@ -436,8 +437,13 @@
       <p id="modeNote" class="mode-note"></p>
     </section>
   </div>
-
-  <section class="scorecard-wrap" id="scoreCard" hidden aria-live="polite">
+  <details class="typed" id="typedBox"><summary>No microphone? Type what was said</summary><textarea id="typedText" placeholder="Type the passage exactly as it was read, mistakes and all"></textarea><div class="row"><button class="btn secondary" id="typedCheck" type="button">Check this reading</button><p class="hint">Only accuracy can be checked from typed words; pace and phrasing are estimated.</p></div></details>
+  <p class="rubric-note"><b>Rubric (from the Read-Aloud Scoring Rules):</b> accuracy /4 · pace /3 · phrasing /3 = 10. Errors count fully, minor errors count partly; sound tips, repeats, fillers and self-corrections never lower the score.</p>
+</main>
+<aside class="fbcol" aria-label="Feedback">
+  <div class="fb-head"><h2>Feedback</h2><p>Accuracy, pace and phrasing for reading.</p></div>
+  <div class="fb-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><p>Tap the microphone and read the passage aloud. Your feedback will appear here.</p></div>
+<section class="scorecard-wrap" id="scoreCard" hidden aria-live="polite">
     <div class="scorecard">
       <div id="ring"></div>
       <div class="score-text">
@@ -512,8 +518,6 @@
       <div class="tries-wrap"><table class="tries" id="tries"></table></div>
     </div>
   </section>
-</main>
-</div>
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
     <span class="grow" id="actionNote"></span>
@@ -521,6 +525,8 @@
     <button type="button" class="btn primary" id="nextPassage">Next passage</button>
   </div>
 </div>
+</aside>
+</div></div>
 <div id="tlTip" class="tl-tip" role="tooltip" hidden></div>
 <div id="wordPop" class="wordpop" role="dialog" aria-label="About this word" hidden></div>
 
@@ -964,7 +970,7 @@ function showResults(heard, info, playUrl, expectText) {
   const a = RS.analyse({ text: passageText(), primary: heard.primary, open: heard.open, silences: heard.silences, snrDb: heard.snrDb });
   current = { id: Date.now().toString(36), at: new Date().toISOString(), passageId: passage().id, title: passage().title, text: passageText(),
               mode: appMode, source: info.source, analysis: a, playUrl, expectText, review: null, quiz: null };
-  if (!a.heardTooLittle && !a.tooNoisy) saveTry(current);
+  if (!a.heardTooLittle && !a.tooNoisy && info.source !== 'typed') saveTry(current); // a typed reading is a check, not a try
   setMic('idle', 'Tap to read again');
   showCurrent();
 
@@ -1178,7 +1184,7 @@ function saveTry(c) {
 function updateTry(c, patch) { const t = loadTries(); const x = t.find(y => y.id === c.id); if (x) { Object.assign(x, patch); store.set(triesKey(), t); } }
 function renderTries() {
   const tries = loadTries(), shown = tries.slice(-6), firstNo = tries.length - shown.length + 1;
-  const how = { mic: 'Read aloud', sample: 'Sample', file: 'Audio file' };
+  const how = { mic: 'Read aloud', sample: 'Sample', file: 'Audio file', typed: 'Typed' };
   $('tries').innerHTML = '<thead><tr><th>Try</th><th>Score</th><th>Accuracy</th><th>Pace</th><th>Mode</th><th>How</th></tr></thead><tbody>' +
     shown.map((t, i) => `<tr class="${current && t.id === current.id ? 'latest' : ''}"><td>${firstNo + i}${current && t.id === current.id ? ' <small>this one</small>' : ''}</td>
       <td>${t.total}/10${t.reviewed ? ' <small>teacher</small>' : ''}${t.quiz ? ` <small>· ${t.quiz}</small>` : ''}</td>
@@ -1379,6 +1385,21 @@ $('passageText').oninput = () => { current = null; renderPassage(); };
 $('passageSelect').onchange();
 
 $('mic').onclick = () => (rec ? stopMic() : startMic());
+// No microphone: check a reading typed by hand. Accuracy is real; pace and phrasing come from estimated timing
+// (about 150 words a minute, with pauses where the typed text has full stops and commas).
+$('typedCheck').onclick = () => {
+  if (rec || busy) return;
+  const raw = $('typedText').value.trim().split(/\s+/).filter(Boolean), words = [];
+  let t = 0.3;
+  for (const r of raw) {
+    const w = RS.norm(r); if (!w) continue;
+    words.push({ word: w, conf: 1, start: +t.toFixed(2), end: +(t + 0.32).toFixed(2) });
+    t += /[.!?]["'”’)]*$/.test(r) ? 0.9 : /[,;:]$/.test(r) ? 0.6 : 0.4;
+  }
+  if (words.length < 3) { $('typedText').focus(); return; }
+  current = null; renderPassage(); setStep('read');
+  showResults({ primary: words, open: words.map(w => ({ ...w })), silences: null, snrDb: null }, { source: 'typed', speed: 'Typed by hand, no audio.' }, null, null);
+};
 $('retry').onclick = () => { current = null; renderPassage(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 $('nextPassage').onclick = () => {
   const presets = PASSAGES.map((p, i) => i).filter(i => PASSAGES[i].id !== 'own');

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Unseen Passage</title>
-<link rel="stylesheet" href="css/base.css?v=4">
+<link rel="stylesheet" href="css/base.css?v=9">
 <link rel="stylesheet" href="css/course.css?v=3">
 <style>
   /* the passage card on the left, the recorder on the right (tablet and up) */
@@ -72,13 +72,17 @@
 </head>
 <body data-kind="read">
 <header class="topbar" id="topbar"></header>
-<div class="panel">
+<div class="panel"><div class="shell">
+<aside class="tasks" aria-label="Unseen passages">
+  <div class="tasks-head"><p class="side-title">Unseen passages</p><div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div></div>
+  <div class="lessons" id="lessons"></div>
+  <p class="tasks-foot">Only your first reading of each passage counts as its score. Reading it again is practice.</p>
+</aside>
+<main class="workcol">
 <div class="pagehead">
   <div><p class="crumb">Communication Skills · Reading</p><h1>Unseen passage</h1></div>
-  <div class="progress" aria-label="Your progress"><div class="track"><div class="fill anim" id="progFill" style="width:0%"></div></div><span id="progText"></span></div>
 </div>
-<main>
-  <section aria-label="Choose a passage"><div class="lessons" id="lessons"></div></section>
+
 
   <ol class="steps" id="steps" aria-label="Steps">
     <li data-step="ready"><span class="n">1</span><span class="lb">Get ready</span></li>
@@ -125,11 +129,12 @@
       </details>
     </section>
   </div>
-
-  <section class="fb" id="results" hidden aria-live="polite"></section>
+  <p class="rubric-note"><b>Rubric (from the Read-Aloud Scoring Rules):</b> accuracy /4 · pace /3 · phrasing /3 = 10. Errors count fully, minor errors count partly; sound tips, repeats, fillers and self-corrections never lower the score.</p>
 </main>
-</div>
-
+<aside class="fbcol" aria-label="Feedback">
+  <div class="fb-head"><h2>Feedback</h2><p>Accuracy, pace and phrasing, and what counted.</p></div>
+  <div class="fb-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg><p>Tap Start reading and read the passage aloud. Your feedback will appear here.</p></div>
+<section class="fb" id="results" hidden aria-live="polite"></section>
 <div class="actionbar" id="actionbar" hidden>
   <div class="actionbar-in">
     <span class="grow" id="actionNote"></span>
@@ -137,6 +142,8 @@
     <button type="button" class="btn primary" id="next">Next passage</button>
   </div>
 </div>
+</aside>
+</div></div>
 
 <script src="js/tasks.js?v=1"></script>
 <script src="js/course.js?v=5"></script>
